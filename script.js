@@ -208,7 +208,7 @@ function showStartPage() {
                 <img src="https://upload.wikimedia.org/wikipedia/it/d/d2/DnD_5e_logo.png" 
                      alt="Dungeons & Dragons Logo" 
                      class="main-logo">
-                <img src="https://static.wikia.nocookie.net/d20modern/images/a/a3/Diceset.png/revision/latest?cb=20200922050323" 
+                <img src="https://openclipart.org/image/800px/svg_to_png/172637/diceset.png" 
                      alt="D&D Dice Set" 
                      class="dice-image">
             </div>
