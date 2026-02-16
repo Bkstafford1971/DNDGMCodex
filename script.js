@@ -222,9 +222,9 @@ async function viewDetails(route, identifier) {
                     }
                     allContent += `<section style="margin: 20px 0; padding: 15px; border: 1px solid #c9ad6a; border-radius: 6px;">${subHtml}</section>`;
                 });
-            } else {
-                allContent += `<p style="color: orange;">No subraces data available in this response.</p>`;
-            }
+            //} else {
+            //    allContent += `<p style="color: orange;">No subraces data available in this response.</p>`;
+            //}
         
             contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
         }
