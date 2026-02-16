@@ -13,7 +13,7 @@ async function fetchData(target) {
 
     // Redirect "feats" to your local JSON file
     if (target === 'feats') {
-        url = 'https://mega.nz/file/4vATXRqR#X1_qYKKM8BI8yc74sz1qwAca0_JZiU-wbX4U1F8MTh4'; 
+        url = 'feats.json'; 
     } else if (target.startsWith('http')) {
         url = target;
     } else {
