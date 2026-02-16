@@ -183,6 +183,8 @@ async function viewDetails(route, identifier) {
                 // Special logic for Races - show all available fields
         else if (route === "races") {
             let allContent = "";
+            if (data.desc) allContent += marked.parse(data.desc);
+            if (data.traits) allContent += marked.parse(data.traits);
             
             if (data.desc) allContent += `<section>${marked.parse(data.desc)}</section>`;
             if (data.ability_bonuses) allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
