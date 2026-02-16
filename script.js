@@ -121,11 +121,15 @@ async function viewDetails(route, identifier) {
     const modal = document.getElementById('detail-modal');
     const modalBody = document.getElementById('modal-body');
     modal.style.display = "block";
+    modalBody.innerHTML = '<p class="loader">Consulting the archives...</p>';
 
     // Logic for your local Feats
     if (route === 'local-feats') {
         const feat = allFetchedItems.find(f => f.name === identifier);
-        if (!feat) return;
+        if (!feat) {
+            modalBody.innerHTML = "Feat not found.";
+            return;
+        }
 
         let benefitsList = feat.benefits.map(b => `<li>${b}</li>`).join('');
         modalBody.innerHTML = `
@@ -142,12 +146,51 @@ async function viewDetails(route, identifier) {
     // Standard API details
     try {
         const response = await fetch(`${API_BASE}/${route}/${identifier}/`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
         const data = await response.json();
-        modalBody.innerHTML = `<h2 class="detail-header">${data.name}</h2><hr>
-                               <div class="description-block">${marked.parse(data.desc || "No info.")}</div>`;
-    } catch (e) { modalBody.innerHTML = "Failed to load details."; }
-}
+        let contentHtml = `<h2 class="detail-header">${data.name || data.title}</h2><hr>`;
 
+        // Special logic for Rule Sections (Conditions, Combat, etc.)
+        // These use the 'desc' field for the main body of text.
+        if (route === 'sections') {
+            contentHtml += `<div class="description-block">${marked.parse(data.desc)}</div>`;
+        } 
+        // Logic for Monsters
+        else if (route === 'monsters') {
+            contentHtml += `
+                <div class="stat-block">
+                    <p><em>${data.size} ${data.type}, ${data.alignment}</em></p>
+                    <div class="stats-bar">
+                        <strong>Armor Class:</strong> ${data.armor_class} (${data.armor_desc || 'natural armor'})<br>
+                        <strong>Hit Points:</strong> ${data.hit_points} (${data.hit_dice})<br>
+                        <strong>Speed:</strong> ${Object.entries(data.speed).map(([k, v]) => `${k} ${v} ft.`).join(', ')}
+                    </div>
+                    <div class="abilities-grid">
+                        <span><strong>STR</strong> <em>${data.strength}</em></span>
+                        <span><strong>DEX</strong> <em>${data.dexterity}</em></span>
+                        <span><strong>CON</strong> <em>${data.constitution}</em></span>
+                        <span><strong>INT</strong> <em>${data.intelligence}</em></span>
+                        <span><strong>WIS</strong> <em>${data.wisdom}</em></span>
+                        <span><strong>CHA</strong> <em>${data.charisma}</em></span>
+                    </div>
+                    ${data.special_abilities ? `<h3>Special Traits</h3><p>${data.special_abilities.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>')}</p>` : ''}
+                    <h3>Actions</h3>
+                    <p>${data.actions ? data.actions.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>') : 'No actions listed.'}</p>
+                </div>`;
+        }
+        // Default logic for Spells, Magic Items, and Backgrounds
+        else {
+            const description = data.desc || data.description || "No description available.";
+            contentHtml += `<div class="description-block">${marked.parse(description)}</div>`;
+        }
+        
+        modalBody.innerHTML = contentHtml;
+    } catch (e) { 
+        console.error("Fetch error:", e);
+        modalBody.innerHTML = `<p class="error">Failed to load details. The archives may be incomplete.</p>`; 
+    }
+}
 function toggleSub(id) { document.getElementById(id).classList.toggle('active'); }
 function closeModal() { document.getElementById('detail-modal').style.display = "none"; }
 window.onclick = (e) => { if(e.target == document.getElementById('detail-modal')) closeModal(); }
