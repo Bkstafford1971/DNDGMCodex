@@ -197,14 +197,30 @@ window.onclick = (e) => { if(e.target == document.getElementById('detail-modal')
 
 function showStartPage() {
     const display = document.getElementById('display-area');
-    display.innerHTML = `<div class="start-page">
-        <img src="https://upload.wikimedia.org/wikipedia/it/d/d2/DnD_5e_logo.png" class="main-logo">
-        <img src="https://static.wikia.nocookie.net/d20modern/images/a/a3/Diceset.png/revision/latest?cb=20200922050323" 
+    const filterUI = document.getElementById('filter-container');
+    
+    if (filterUI) filterUI.style.display = 'none';
+
+    display.innerHTML = `
+        <div class="start-page">
+            <div class="hero-images">
+                <img src="https://upload.wikimedia.org/wikipedia/it/d/d2/DnD_5e_logo.png" 
+                     alt="Dungeons & Dragons Logo" 
+                     class="main-logo">
+                <img src="https://static.wikia.nocookie.net/d20modern/images/a/a3/Diceset.png/revision/latest?cb=20200922050323" 
                      alt="D&D Dice Set" 
                      class="dice-image">
-        <h1>The Dungeon Masters Codex</h1>
-        <p class="subtitle">The archives are at your command.</p>
-    </div>`;
+            </div>
+            <h1>The Dungeon Masters Codex</h1>
+            <p class="subtitle">The archives are at your command. Select a category from the sidebar to begin your session.</p>
+            
+            <div class="session-note">
+                <p><em>"The evening is young, and the dungeon is deep. May your natural 20s be many."</em></p>
+            </div>
+        </div>
+    `;
 }
 
-window.onload = () => showStartPage();
+window.onload = () => {
+    showStartPage();
+};
