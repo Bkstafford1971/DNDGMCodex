@@ -179,49 +179,52 @@ async function viewDetails(route, identifier) {
                     <p>${data.actions ? data.actions.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>') : 'No actions listed.'}</p>
                 </div>`;
         }
-        
-                // Special logic for Races - show all available fields
+    // Maion Race display logic    
         else if (route === "races") {
             let allContent = "";
         
-            // Introductory description
+            // Main race description
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
             }
         
-            // Ability Score Increase (usually already plain or simple, but safe to parse)
+            // Ability Score Increase (use asi_desc if present for formatted text)
             if (data.asi_desc) {
-                allContent += `<section><h3>Ability Score Increase</h3>${marked.parse(data.asi_desc)}</section>`;
-            } else if (data.ability_bonuses) {  // fallback if older structure
+                allContent += `<section>${marked.parse(data.asi_desc)}</section>`;
+            } else if (data.ability_bonuses) {  // older/fallback
                 allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
             }
         
-            // Age, Alignment, Size, Speed, Languages — these contain the problematic **_Field._** markdown
-            if (data.age) {
-                allContent += `<section>${marked.parse(data.age)}</section>`;
-            }
-            if (data.alignment) {
-                allContent += `<section>${marked.parse(data.alignment)}</section>`;
-            }
-            if (data.size) {
-                allContent += `<section>${marked.parse(data.size)}</section>`;
-            }
-            if (data.speed_desc) {           // prefer speed_desc if available (has markdown)
+            // Age, Alignment, Size, Speed, Languages, Vision/Darkvision — parse their _desc fields
+            if (data.age) allContent += `<section>${marked.parse(data.age)}</section>`;
+            if (data.alignment) allContent += `<section>${marked.parse(data.alignment)}</section>`;
+            if (data.size) allContent += `<section>${marked.parse(data.size)}</section>`;
+            if (data.speed_desc) {
                 allContent += `<section>${marked.parse(data.speed_desc)}</section>`;
             } else if (data.speed) {
-                // fallback: format raw speed object nicely
                 const speedText = Object.entries(data.speed)
                     .map(([type, val]) => `${type} ${val} ft.`)
                     .join(", ");
                 allContent += `<section><h3>Speed</h3><p>Your base ${speedText}</p></section>`;
             }
-            if (data.languages) {
-                allContent += `<section>${marked.parse(data.languages)}</section>`;
+            if (data.vision) allContent += `<section>${marked.parse(data.vision)}</section>`;
+            if (data.languages) allContent += `<section>${marked.parse(data.languages)}</section>`;
+        
+            // Main racial traits
+            if (data.traits) {
+                allContent += `<section><h3>Racial Traits</h3>${marked.parse(data.traits)}</section>`;
             }
         
-            // Traits (already handled, but ensure it's parsed once)
-            if (data.traits) {
-                allContent += `<section><h3>Traits</h3>${marked.parse(data.traits)}</section>`;
+            // Subraces (e.g., Rock Gnome)
+            if (data.subraces && data.subraces.length > 0) {
+                allContent += `<h2>Subraces</h2>`;
+                data.subraces.forEach(subrace => {
+                    let subContent = `<h3>${subrace.name}</h3>`;
+                    if (subrace.desc) subContent += marked.parse(subrace.desc);
+                    if (subrace.asi_desc) subContent += `<p>${marked.parse(subrace.asi_desc)}</p>`;
+                    if (subrace.traits) subContent += `<h4>Subrace Traits</h4>${marked.parse(subrace.traits)}`;
+                    allContent += `<section style="margin-top: 20px; border-top: 1px solid #c9ad6a; padding-top: 15px;">${subContent}</section>`;
+                });
             }
         
             contentHtml += `<div class="description-block">${allContent || "No description available."}</div>`;
