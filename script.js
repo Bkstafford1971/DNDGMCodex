@@ -195,6 +195,7 @@ function toggleSub(id) { document.getElementById(id).classList.toggle('active');
 function closeModal() { document.getElementById('detail-modal').style.display = "none"; }
 window.onclick = (e) => { if(e.target == document.getElementById('detail-modal')) closeModal(); }
 
+// --- 6. START PAGE ---
 function showStartPage() {
     const display = document.getElementById('display-area');
     const filterUI = document.getElementById('filter-container');
