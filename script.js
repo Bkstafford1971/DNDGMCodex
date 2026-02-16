@@ -182,10 +182,7 @@ async function viewDetails(route, identifier) {
     // Maion Race display logic    
         else if (route === "races") {
             let allContent = "";
-        
-            // Debug line (remove later)
-            allContent += `<p style="color: red; font-weight: bold;">DEBUG: Subraces found: ${data.subraces?.length || 0}</p>`;
-        
+                            
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
             }
