@@ -179,6 +179,34 @@ async function viewDetails(route, identifier) {
                     <p>${data.actions ? data.actions.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>') : 'No actions listed.'}</p>
                 </div>`;
         }
+
+        // Special logic for Races
+        else if (route === "races") {
+            let allSections = "";
+            
+            // Gather all available race information
+            const sections = [
+                { label: "", content: data.desc || data.description || "" },
+                { label: "Ability Score Increase", content: data.asi_desc || "" },
+                { label: "Age", content: data.age || "" },
+                { label: "Alignment", content: data.alignment || "" },
+                { label: "Size", content: data.size_desc || "" },
+                { label: "Speed", content: data.speed || "" },
+                { label: "Languages", content: data.languages || "" },
+                { label: "Traits", content: data.traits || "" }
+            ];
+            
+            sections.forEach(section => {
+                if (section.content) {
+                    if (section.label) {
+                        allSections += `<h3>${section.label}</h3>`;
+                    }
+                    allSections += `<p>${marked.parse(section.content)}</p>`;
+                }
+            });
+            
+            contentHtml += `<div class="description-block">${allSections || "No description available."}</div>`;
+        }
         // Default logic for Spells, Magic Items, and Backgrounds
         else {
             const description = data.desc || data.description || "No description available.";
