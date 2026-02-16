@@ -184,46 +184,52 @@ async function viewDetails(route, identifier) {
             let allContent = "";
         
             // Debug line (remove later)
+            allContent += `<p style="color: red; font-weight: bold;">DEBUG: Subraces found: ${data.subraces?.length || 0}</p>`;
+        
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
             }
         
-            // Ability Score Increase (usually already plain or simple, but safe to parse)
             if (data.asi_desc) {
-                allContent += `<section><h3>Ability Score Increase</h3>${marked.parse(data.asi_desc)}</section>`;
-            } else if (data.ability_bonuses) {  // fallback if older structure
-                allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
+                allContent += `<section>${marked.parse(data.asi_desc)}</section>`;
             }
         
-            // Age, Alignment, Size, Speed, Languages — these contain the problematic **_Field._** markdown
-            if (data.age) {
-                allContent += `<section>${marked.parse(data.age)}</section>`;
-            }
-            if (data.alignment) {
-                allContent += `<section>${marked.parse(data.alignment)}</section>`;
-            }
-            if (data.size) {
-                allContent += `<section>${marked.parse(data.size)}</section>`;
-            }
-            if (data.speed_desc) {           // prefer speed_desc if available (has markdown)
+            if (data.age) allContent += `<section>${marked.parse(data.age)}</section>`;
+            if (data.alignment) allContent += `<section>${marked.parse(data.alignment)}</section>`;
+            if (data.size) allContent += `<section>${marked.parse(data.size)}</section>`;
+        
+            if (data.speed_desc) {
                 allContent += `<section>${marked.parse(data.speed_desc)}</section>`;
-            } else if (data.speed) {
-                // fallback: format raw speed object nicely
-                const speedText = Object.entries(data.speed)
-                    .map(([type, val]) => `${type} ${val} ft.`)
-                    .join(", ");
-                allContent += `<section><h3>Speed</h3><p>Your base ${speedText}</p></section>`;
-            }
-            if (data.languages) {
-                allContent += `<section>${marked.parse(data.languages)}</section>`;
+            } else if (data.speed && typeof data.speed === 'object') {
+                const speedText = Object.entries(data.speed).map(([k, v]) => `${k} ${v} ft.`).join(', ');
+                allContent += `<section><h3>Speed</h3><p>Your base walking speed is ${speedText}.</p></section>`;
             }
         
-            // Traits (already handled, but ensure it's parsed once)
+            if (data.vision) allContent += `<section>${marked.parse(data.vision)}</section>`;
+            if (data.languages) allContent += `<section>${marked.parse(data.languages)}</section>`;
+        
             if (data.traits) {
-                allContent += `<section><h3>Traits</h3>${marked.parse(data.traits)}</section>`;
+                allContent += `<section><h3>Racial Traits</h3>${marked.parse(data.traits)}</section>`;
             }
         
-            contentHtml += `<div class="description-block">${allContent || "No description available."}</div>`;
+            // Subraces – this is the key part
+            if (Array.isArray(data.subraces) && data.subraces.length > 0) {
+                allContent += `<h2>Subraces</h2>`;
+                data.subraces.forEach(sub => {
+                    let subHtml = `<h3>${sub.name}</h3>`;
+                    if (sub.desc) subHtml += marked.parse(sub.desc);
+                    if (sub.asi_desc) subHtml += `<p>${marked.parse(sub.asi_desc)}</p>`;
+                    if (sub.traits) {
+                        // Parse traits and convert newlines/lists properly
+                        subHtml += `<h4>Subrace Traits</h4>${marked.parse(sub.traits)}`;
+                    }
+                    allContent += `<section style="margin: 20px 0; padding: 15px; border: 1px solid #c9ad6a; border-radius: 6px;">${subHtml}</section>`;
+                });
+            } else {
+                allContent += `<p style="color: orange;">No subraces data available in this response.</p>`;
+            }
+        
+            contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
         }
         
         modalBody.innerHTML = contentHtml;
