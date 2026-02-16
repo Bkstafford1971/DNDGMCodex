@@ -1,0 +1,364 @@
+/* --- D&D Master Codex: Consolidated Master Styles --- */
+
+:root {
+    --sidebar-bg: #1a1a1a;
+    --sidebar-hover: #333;
+    --accent-red: #b91c1c;      /* Primary highlights */
+    --deep-red: #58180d;       /* Headers and table headers */
+    --parchment: #fdf1dc;      /* Modal background */
+    --text-dark: #2d2d2d;
+    --gold: #c9ad6a;           /* Borders and accents */
+    --shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* --- Base Layout --- */
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    display: flex;
+    background: #f4f4f4;
+    color: var(--text-dark);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+/* --- Sidebar Navigation --- */
+.sidebar {
+    width: 280px;
+    background: var(--sidebar-bg);
+    color: #e0e0e0;
+    padding: 20px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+    box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+}
+
+.sidebar h2 {
+    padding: 0 20px;
+    color: var(--accent-red);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar li {
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    font-size: 0.95rem;
+    color: #bbb;
+}
+
+.sidebar li:hover {
+    background: var(--sidebar-hover);
+    border-left-color: var(--accent-red);
+    color: white;
+}
+
+/* --- Submenu & Indentation --- */
+.submenu {
+    display: none;
+    background: #111;
+}
+
+.submenu.active {
+    display: block;
+}
+
+.submenu li {
+    padding-left: 40px; /* Indent for sub-categories */
+    font-size: 0.85rem;
+    color: #999;
+}
+
+.submenu li::before {
+    content: "— ";
+    color: var(--gold);
+    margin-right: 8px;
+    opacity: 0.5;
+}
+
+.submenu li:hover {
+    padding-left: 45px;
+    color: var(--gold);
+}
+
+/* --- Main Content Area --- */
+.content {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    background: #fdfdfd;
+}
+
+#global-search {
+    width: 100%;
+    max-width: 800px;
+    padding: 15px 25px;
+    font-size: 1.1rem;
+    border-radius: 50px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+    outline: none;
+}
+
+/* --- Master Tables --- */
+.magic-item-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-top: 20px;
+}
+
+.magic-item-table th {
+    background: var(--deep-red);
+    color: white;
+    text-align: left;
+    padding: 15px;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.magic-item-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.magic-item-table tr:hover td {
+    background: #fff8eb;
+}
+
+.cell-bold {
+    font-weight: bold;
+    color: var(--deep-red);
+    width: 60px;
+}
+
+.source-tag {
+    color: #777;
+    font-style: italic;
+    font-size: 0.75rem;
+}
+
+/* --- Rarity Color Tags --- */
+.rarity-tag {
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.rarity-tag.common { background: #d1d1d1; color: #333; }
+.rarity-tag.uncommon { background: #228b22; color: white; }
+.rarity-tag.rare { background: #0070dd; color: white; }
+.rarity-tag.very-rare { background: #a335ee; color: white; }
+.rarity-tag.legendary { background: #ff8000; color: white; }
+.rarity-tag.artifact { background: #e6cc80; color: #333; border: 1px solid #c9ad6a; }
+
+/* --- Detail Modal --- */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.85);
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background-color: var(--parchment);
+    margin: 2% auto;
+    padding: 40px;
+    border: 3px solid var(--deep-red);
+    width: 85%;
+    max-width: 900px;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+    border-radius: 4px;
+}
+
+.close-button {
+    position: absolute;
+    right: 25px;
+    top: 15px;
+    font-size: 40px;
+    cursor: pointer;
+    color: var(--deep-red);
+}
+
+.detail-header {
+    color: var(--deep-red);
+    font-family: 'Georgia', serif;
+    font-size: 2.5rem;
+    margin: 0;
+}
+
+/* --- Article Styling (Races/Mechanics) --- */
+.description-block {
+    line-height: 1.8;
+    color: var(--text-dark);
+}
+
+.description-block h2, .description-block h3 {
+    color: var(--deep-red);
+    border-bottom: 1px solid var(--gold);
+    padding-bottom: 5px;
+    margin-top: 25px;
+}
+
+/* --- Monster Stat Block --- */
+.stat-block h3 {
+    border-bottom: 2px solid var(--deep-red);
+    color: var(--deep-red);
+    margin-top: 25px;
+    text-transform: uppercase;
+    font-size: 1.2rem;
+}
+
+.abilities-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    text-align: center;
+    background: #f2e1c1;
+    padding: 15px 10px;
+    border-radius: 4px;
+    margin: 20px 0;
+    border: 1px solid var(--gold);
+}
+
+.abilities-grid span {
+    display: flex;
+    flex-direction: column;
+    font-weight: bold;
+    color: var(--deep-red);
+    font-size: 0.9rem;
+}
+
+.abilities-grid span em {
+    font-style: normal;
+    color: var(--text-dark);
+    font-size: 1.1rem;
+}
+
+/* --- Utilities --- */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 40px 0;
+}
+
+.page-btn {
+    background: var(--deep-red);
+    color: white;
+    border: none;
+    padding: 10px 25px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: 'Georgia', serif;
+}
+
+.loader {
+    text-align: center;
+    margin-top: 100px;
+    font-style: italic;
+    color: #666;
+}
+/* Prevent long text in tables from stretching rows too much */
+.magic-item-table td {
+    max-width: 400px;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+.magic-item-table td:nth-child(2) {
+    max-width: 350px; /* Limits the Size column width */
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* --- Start Page Logo Styling --- */
+.start-page {
+    text-align: center;
+    max-width: 900px;
+    margin: 80px auto; /* Increased margin for better vertical centering */
+    padding: 20px;
+}
+
+.main-logo {
+    width: 100%;
+    max-width: 700px; /* Adjust this size to fit your preference */
+    height: auto;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2)); /* Adds a subtle depth to the logo */
+}
+
+.start-page h1 {
+    font-family: 'Georgia', serif;
+    font-size: 2.5rem;
+    color: var(--deep-red);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    color: #555;
+    font-style: italic;
+    margin-bottom: 40px;
+}
+
+.session-note {
+    margin-top: 50px;
+    padding: 20px;
+    border-top: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: 'Georgia', serif;
+    font-size: 1.2rem;
+}
+/* --- Start Page Image Layout --- */
+.hero-images {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.dice-image {
+    width: 100%;
+    max-width: 220px; /* Slightly smaller than the logo for balance */
+    height: auto;
+    filter: drop-shadow(0 8px 12px rgba(0,0,0,0.3)); /* Stronger shadow for the dice */
+    opacity: 0.9; /* Subtle transparency to blend with the background */
+}
+
+/* Ensure the main logo doesn't have too much bottom margin now */
+.main-logo {
+    margin-bottom: 10px !important;
+}

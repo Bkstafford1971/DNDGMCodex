@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Master Codex</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+			<h2 onclick="showStartPage()" style="cursor: pointer;">D&D Codex</h2>
+            <ul id="main-nav">
+                <li onclick="toggleSub('char-sub')">Characters ▾
+                    <ul id="char-sub" class="submenu">
+                        <li onclick="viewDetails('sections', 'backgrounds')">Backgrounds (General Info)</li>
+						<li onclick="viewDetails('sections', 'feats')">Feats (General Info)</li>
+                        <li onclick="viewDetails('sections', 'races')">Races (General Info)</li>
+                        <li onclick="viewDetails('sections', 'alignment')">Alignment</li>
+                        <li onclick="viewDetails('sections', 'languages')">Languages</li>
+                        <li onclick="viewDetails('sections', 'leveling-up')">Leveling Up</li>
+                        <li onclick="viewDetails('sections', 'multiclassing')">Multiclassing</li>
+                    </ul>
+                </li>
+
+                <li onclick="toggleSub('class-sub')">Classes ▾
+                    <ul id="class-sub" class="submenu">
+                        <li onclick="viewDetails('classes', 'barbarian')">Barbarian</li>
+                        <li onclick="viewDetails('classes', 'bard')">Bard</li>
+                        <li onclick="viewDetails('classes', 'cleric')">Cleric</li>
+                        <li onclick="viewDetails('classes', 'druid')">Druid</li>
+                        <li onclick="viewDetails('classes', 'fighter')">Fighter</li>
+                        <li onclick="viewDetails('classes', 'monk')">Monk</li>
+                        <li onclick="viewDetails('classes', 'paladin')">Paladin</li>
+                        <li onclick="viewDetails('classes', 'ranger')">Ranger</li>
+                        <li onclick="viewDetails('classes', 'rogue')">Rogue</li>
+                        <li onclick="viewDetails('classes', 'sorcerer')">Sorcerer</li>
+                        <li onclick="viewDetails('classes', 'warlock')">Warlock</li>
+                        <li onclick="viewDetails('classes', 'wizard')">Wizard</li>
+                    </ul>
+                </li>
+
+				<li onclick="fetchData('conditions')">Conditions</li>
+                <li onclick="toggleSub('races-menu')">Races ▾</li>
+				<ul id="races-menu" class="submenu">
+					<li onclick="fetchData('races')">All Races (Table)</li>
+					<li onclick="viewDetails('races', 'dragonborn')">Dragonborn</li>
+					<li onclick="viewDetails('races', 'dwarf')">Dwarf</li>
+					<li onclick="viewDetails('races', 'elf')">Elf</li>
+					<li onclick="viewDetails('races', 'gnome')">Gnome</li>
+					<li onclick="viewDetails('races', 'half-elf')">Half-Elf</li>
+					<li onclick="viewDetails('races', 'half-orc')">Half-Orc</li>
+					<li onclick="viewDetails('races', 'halfling')">Halfling</li>
+					<li onclick="viewDetails('races', 'human')">Human</li>
+					<li onclick="viewDetails('races', 'tiefling')">Tiefling</li>
+				</ul>
+				<li onclick="fetchData('backgrounds')">Backgrounds</li>
+				<li onclick="fetchData('feats')">Feats</li>
+                
+                <li onclick="toggleSub('combat-sub')">Combat ▾
+                    <ul id="combat-sub" class="submenu">
+                        <li onclick="viewDetails('sections', 'actions-in-combat')">Actions in Combat</li>
+                        <li onclick="viewDetails('sections', 'attacking')">Attacking</li>
+                        <li onclick="viewDetails('sections', 'combat-sequence')">Combat Sequence</li>
+                        <li onclick="viewDetails('sections', 'cover')">Cover</li>
+                        <li onclick="viewDetails('sections', 'damage-and-healing')">Damage and Healing</li>
+                        <li onclick="viewDetails('sections', 'mounted-combat')">Mounted Combat</li>
+                        <li onclick="viewDetails('sections', 'underwater-combat')">Underwater Combat</li>
+                    </ul>
+                </li>
+				
+                <li onclick="toggleSub('equip-sub')">Equipment ▾
+                    <ul id="equip-sub" class="submenu">
+                        <li onclick="viewDetails('sections', 'adventuring-gear')">Adventuring Gear</li>
+                        <li onclick="viewDetails('sections', 'armor')">Armor (General Info)</li>
+                        <li onclick="viewDetails('sections', 'weapons')">Weapons (General Info)</li>
+                        <li onclick="viewDetails('sections', 'coins')">Coins</li>
+                        <li onclick="viewDetails('sections', 'equipment-packs')">Equipment Packs</li>
+                        <li onclick="viewDetails('sections', 'expenses')">Expenses</li>
+                        <li onclick="viewDetails('sections', 'mounts-and-vehicles')">Mounts and Vehicles</li>
+                        <li onclick="viewDetails('sections', 'selling-treasure')">Selling Treasure</li>
+                        <li onclick="viewDetails('sections', 'tools')">Tools</li>
+                        <li onclick="viewDetails('sections', 'trade-goods')">Trade Goods</li>
+                        <li onclick="fetchData('weapons')">Weapons</li>
+                        <li onclick="fetchData('armor')">Armor</li>
+                    </ul>
+                </li>
+
+				<li onclick="fetchData('magicitems')">Magic Items</li>
+
+                <li onclick="toggleSub('spells-sub')">Spells ▾
+                    <ul id="spells-sub" class="submenu">
+                        <li onclick="viewDetails('sections', 'spells')">Spells (General Info)</li>
+                        <li onclick="fetchData('spells')">All Spells</li>
+                        <li onclick="fetchSpellsByClass('Bard')">Bard Spells</li>
+                        <li onclick="fetchSpellsByClass('Cleric')">Cleric Spells</li>
+                        <li onclick="fetchSpellsByClass('Druid')">Druid Spells</li>
+                        <li onclick="fetchSpellsByClass('Paladin')">Paladin Spells</li>
+                        <li onclick="fetchSpellsByClass('Ranger')">Ranger Spells</li>
+                        <li onclick="fetchSpellsByClass('Sorcerer')">Sorcerer Spells</li>
+                        <li onclick="fetchSpellsByClass('Warlock')">Warlock Spells</li>
+                        <li onclick="fetchSpellsByClass('Wizard')">Wizard Spells</li>
+                    </ul>
+                </li>
+
+                <li onclick="fetchData('monsters')">Monsters</li>
+				
+				<li onclick="toggleSub('mechanics-menu')">Gameplay Mechanics ▾</li>
+				<ul id="mechanics-menu" class="submenu">
+					<li onclick="fetchData('sections/abilities')">Abilities</li>
+					<li onclick="fetchData('sections/between-adventures')">Between Adventures</li>
+					<li onclick="fetchData('sections/environment')">Environment</li>
+					<li onclick="fetchData('sections/movement')">Movement</li>
+					<li onclick="fetchData('sections/rest')">Rest</li>
+					<li onclick="fetchData('sections/saving-throws')">Saving Throws</li>
+					<li onclick="fetchData('sections/spellcasting')">Spellcasting</li>
+					<li onclick="fetchData('sections/time')">Time</li>
+				</ul>
+				
+				<li onclick="toggleSub('running-game-menu')">Running a Game ▾</li>
+				<ul id="running-game-menu" class="submenu">
+					<li onclick="fetchData('sections/conditions')">Conditions Info</li>
+					<li onclick="fetchData('sections/diseases')">Diseases</li>
+					<li onclick="fetchData('sections/madness')">Madness</li>
+					<li onclick="fetchData('sections/magic-items')">Magic Items</li>
+					<li onclick="fetchData('sections/monsters')">Monsters</li>
+					<li onclick="fetchData('sections/nonplayer-characters')">Nonplayer Characters</li>
+					<li onclick="fetchData('sections/objects')">Objects</li>
+					<li onclick="fetchData('sections/pantheons')">Pantheons</li>
+					<li onclick="fetchData('sections/planes')">Planes</li>
+					<li onclick="fetchData('sections/poisons')">Poisons</li>
+					<li onclick="fetchData('sections/traps')">Traps</li>
+				</ul>
+				
+                <li onclick="fetchData('weapons')">Weapons</li>
+                <li onclick="fetchData('armor')">Armor</li>
+                
+            </ul>
+        </nav>
+
+        <main class="content">
+            <header>
+                <input type="text" id="global-search" placeholder="Search the codex..." onkeyup="handleSearch(event)">
+            </header>
+
+            <div id="filter-container" style="display:none; margin-bottom: 20px; padding: 15px; background: #eee1c5; border: 1px solid #c9ad6a; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong>Filter by Source:</strong>
+                </div>
+                <div id="source-checkboxes" style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                    </div>
+            </div>
+
+            <div id="display-area">
+                <div class="welcome-msg">
+                    <h1>Welcome, Adventurer</h1>
+                    <p>Select a category or search to begin your journey.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="detail-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
