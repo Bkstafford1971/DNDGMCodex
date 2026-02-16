@@ -179,10 +179,13 @@ async function viewDetails(route, identifier) {
                     <p>${data.actions ? data.actions.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>') : 'No actions listed.'}</p>
                 </div>`;
         }
-    // Maion Race display logic    
+    // Main Race display logic    
         else if (route === "races") {
             let allContent = "";
-                            
+        
+            // Debug line (remove later)
+            allContent += `<p style="color: red; font-weight: bold;">DEBUG: Subraces found: ${data.subraces?.length || 0}</p>`;
+        
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
             }
@@ -223,7 +226,7 @@ async function viewDetails(route, identifier) {
                     allContent += `<section style="margin: 20px 0; padding: 15px; border: 1px solid #c9ad6a; border-radius: 6px;">${subHtml}</section>`;
                 });
             } else {
-                allContent += `<p style="color: orange;"> </p>`;
+                allContent += `<p style="color: orange;">No subraces data available in this response.</p>`;
             }
         
             contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
