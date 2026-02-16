@@ -180,6 +180,21 @@ async function viewDetails(route, identifier) {
                 </div>`;
         }
         
+                // Special logic for Races - show all available fields
+        else if (route === "races") {
+            let allContent = "";
+            
+            if (data.desc) allContent += `<section>${marked.parse(data.desc)}</section>`;
+            if (data.ability_bonuses) allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
+            if (data.age) allContent += `<section><h3>Age</h3><p>${data.age}</p></section>`;
+            if (data.alignment) allContent += `<section><h3>Alignment</h3><p>${data.alignment}</p></section>`;
+            if (data.size) allContent += `<section><h3>Size</h3><p>${data.size}</p></section>`;
+            if (data.speed) allContent += `<section><h3>Speed</h3><p>${data.speed}</p></section>`;
+            if (data.languages) allContent += `<section><h3>Languages</h3><p>${data.languages}</p></section>`;
+            if (data.traits) allContent += `<section><h3>Traits</h3><p>${marked.parse(data.traits)}</p></section>`;
+            
+            contentHtml += `<div class="description-block">${allContent || "No description available."}</div>`;
+        }
         // Default logic for Spells, Magic Items, and Backgrounds
         else {
             const description = data.desc || data.description || "No description available.";
