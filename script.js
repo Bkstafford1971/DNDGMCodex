@@ -183,24 +183,48 @@ async function viewDetails(route, identifier) {
                 // Special logic for Races - show all available fields
         else if (route === "races") {
             let allContent = "";
-            if (data.desc) allContent += marked.parse(data.desc);
-            if (data.traits) allContent += marked.parse(data.traits);
-            
-            if (data.desc) allContent += `<section>${marked.parse(data.desc)}</section>`;
-            if (data.ability_bonuses) allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
-            if (data.age) allContent += `<section><h3>Age</h3><p>${data.age}</p></section>`;
-            if (data.alignment) allContent += `<section><h3>Alignment</h3><p>${data.alignment}</p></section>`;
-            if (data.size) allContent += `<section><h3>Size</h3><p>${data.size}</p></section>`;
-            if (data.speed) allContent += `<section><h3>Speed</h3><p>${data.speed}</p></section>`;
-            if (data.languages) allContent += `<section><h3>Languages</h3><p>${data.languages}</p></section>`;
-            if (data.traits) allContent += `<section><h3>Traits</h3><p>${marked.parse(data.traits)}</p></section>`;
-            
+        
+            // Introductory description
+            if (data.desc) {
+                allContent += `<section>${marked.parse(data.desc)}</section>`;
+            }
+        
+            // Ability Score Increase (usually already plain or simple, but safe to parse)
+            if (data.asi_desc) {
+                allContent += `<section><h3>Ability Score Increase</h3>${marked.parse(data.asi_desc)}</section>`;
+            } else if (data.ability_bonuses) {  // fallback if older structure
+                allContent += `<section><h3>Ability Score Increases</h3><p>${data.ability_bonuses}</p></section>`;
+            }
+        
+            // Age, Alignment, Size, Speed, Languages — these contain the problematic **_Field._** markdown
+            if (data.age) {
+                allContent += `<section>${marked.parse(data.age)}</section>`;
+            }
+            if (data.alignment) {
+                allContent += `<section>${marked.parse(data.alignment)}</section>`;
+            }
+            if (data.size) {
+                allContent += `<section>${marked.parse(data.size)}</section>`;
+            }
+            if (data.speed_desc) {           // prefer speed_desc if available (has markdown)
+                allContent += `<section>${marked.parse(data.speed_desc)}</section>`;
+            } else if (data.speed) {
+                // fallback: format raw speed object nicely
+                const speedText = Object.entries(data.speed)
+                    .map(([type, val]) => `${type} ${val} ft.`)
+                    .join(", ");
+                allContent += `<section><h3>Speed</h3><p>Your base ${speedText}</p></section>`;
+            }
+            if (data.languages) {
+                allContent += `<section>${marked.parse(data.languages)}</section>`;
+            }
+        
+            // Traits (already handled, but ensure it's parsed once)
+            if (data.traits) {
+                allContent += `<section><h3>Traits</h3>${marked.parse(data.traits)}</section>`;
+            }
+        
             contentHtml += `<div class="description-block">${allContent || "No description available."}</div>`;
-        }
-        // Default logic for Spells, Magic Items, and Backgrounds
-        else {
-            const description = data.desc || data.description || "No description available.";
-            contentHtml += `<div class="description-block">${marked.parse(description)}</div>`;
         }
         
         modalBody.innerHTML = contentHtml;
