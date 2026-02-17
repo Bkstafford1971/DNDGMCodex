@@ -3,7 +3,7 @@
 A clean, fast, offline-capable **Dungeon Master's reference tool** built with vanilla HTML, CSS, and JavaScript.  
 Browse 5th Edition rules, classes, races, spells, monsters, magic items, feats, combat mechanics, conditions, and more — all in one elegant interface.
 
-![D&D Master Codex Screenshot](https://via.placeholder.com/1280x720/1a1a1a/ffffff?text=D%26D+Master+Codex+Interface)  
+<!-- ![D&D Master Codex Screenshot](https://via.placeholder.com/1280x720/1a1a1a/ffffff?text=D%26D+Master+Codex+Interface)   --> 
 *(replace with real screenshot when you have one)*
 
 ## Features
@@ -114,14 +114,3 @@ Built with love for D&D 5e tables everywhere.
 May your rolls be high and your session zero drama-free. 🎲
 
 ```
-
-Feel free to copy-paste this directly into a `README.md` file.
-
-Let me know if you'd like:
-
-- A shorter version
-- GitHub-flavored badges (stars, license, etc.)
-- Sections for future roadmap / planned features
-- Specific credits for icons/fonts if you're using any
-
-Happy DMing!
