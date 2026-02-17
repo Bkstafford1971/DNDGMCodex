@@ -230,6 +230,19 @@ body {
     margin-top: 25px;
 }
 
+.description-block h5 {
+    color: #8B0000;               /* Dark red, thematic for barbarian fury */
+    font-size: 1.35rem;
+    margin: 1.6em 0 0.6em;
+    font-weight: bold;
+    border-bottom: 1px solid #c9ad6a;
+    padding-bottom: 0.2em;
+}
+
+.description-block h5:first-of-type {
+    margin-top: 0.8em;            /* Less space before first feature */
+}
+
 /* --- Monster Stat Block --- */
 .stat-block h3 {
     border-bottom: 2px solid var(--deep-red);
