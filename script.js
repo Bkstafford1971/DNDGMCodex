@@ -151,9 +151,25 @@ async function viewDetails(route, identifier) {
         const data = await response.json();
         let contentHtml = `<h2 class="detail-header">${data.name || data.title}</h2><hr>`;
 
-        // Special logic for Rule Sections (Conditions, Combat, etc.)
+        // Special logic for Rule Sections (Conditions, Combat, etc.) — improved & future-proof
         if (route === 'sections') {
-            contentHtml += `<div class="description-block">${marked.parse(data.desc)}</div>`;
+            let contentParts = [];
+
+            // Main markdown content — this is where conditions and most rules live
+            if (data.desc && data.desc.trim().length > 20) {
+                contentParts.push(marked.parse(data.desc));
+            }
+
+            // Fallback when content is missing/empty (helps debugging & UX)
+            if (contentParts.length === 0) {
+                contentParts.push(
+                    `<p style="color: #e67e22; font-style: italic;">` +
+                    `(No detailed rules text found in API response for "${data.name}". ` +
+                    `The entry may be incomplete or placeholder in the Open5e database.)</p>`
+                );
+            }
+
+            contentHtml += `<div class="description-block">${contentParts.join('\n')}</div>`;
         } 
         // Logic for Monsters
         else if (route === 'monsters') {
@@ -182,12 +198,10 @@ async function viewDetails(route, identifier) {
         else if (route === "classes") {
             let allContent = "";
         
-            // Description
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
             }
         
-            // Hit Points
             if (data.hit_dice || data.hp_at_1st_level || data.hp_at_higher_levels) {
                 allContent += `<section><h3>Hit Points</h3>`;
                 if (data.hit_dice) allContent += `<p><strong>Hit Dice:</strong> ${data.hit_dice}</p>`;
@@ -196,7 +210,6 @@ async function viewDetails(route, identifier) {
                 allContent += `</section>`;
             }
         
-            // Proficiencies
             allContent += `<section><h3>Proficiencies</h3>`;
             if (data.prof_armor) allContent += `<p><strong>Armor:</strong> ${data.prof_armor}</p>`;
             if (data.prof_weapons) allContent += `<p><strong>Weapons:</strong> ${data.prof_weapons}</p>`;
@@ -205,17 +218,14 @@ async function viewDetails(route, identifier) {
             if (data.prof_skills) allContent += `<p><strong>Skills:</strong> ${data.prof_skills}</p>`;
             allContent += `</section>`;
         
-            // Equipment
             if (data.equipment) {
                 allContent += `<section>${marked.parse(data.equipment)}</section>`;
             }
         
-            // Table (Class Features)
             if (data.table) {
                 allContent += `<section>${marked.parse(data.table)}</section>`;
             }
         
-            // Spellcasting
             if (data.spellcasting_ability) {
                 allContent += `<section><h3>Spellcasting</h3>`;
                 allContent += `<p><strong>Spellcasting Ability:</strong> ${data.spellcasting_ability}</p>`;
@@ -223,24 +233,20 @@ async function viewDetails(route, identifier) {
                 allContent += `</section>`;
             }
         
-            // Archetypes/Subclasses – improved markdown handling
             if (Array.isArray(data.archetypes) && data.archetypes.length > 0) {
-                allContent += `<h2>${data.subtypes_name || 'Primal Paths' || 'Archetypes'}</h2>`;
+                allContent += `<h2>${data.subtypes_name || 'Archetypes'}</h2>`;
                 
                 data.archetypes.forEach(arch => {
                     let archHtml = `<h3>${arch.name}</h3>`;
                     
-                    // 1. Main description (usually flavor text)
                     if (arch.desc && typeof arch.desc === 'string' && arch.desc.trim().length > 0) {
                         archHtml += marked.parse(arch.desc);
                     }
                     
-                    // 2. Table field – most common location for ##### feature headings
                     if (arch.table && typeof arch.table === 'string' && arch.table.trim().length > 0) {
                         archHtml += marked.parse(arch.table);
                     }
                     
-                    // 3. If features is an array (some API responses structure it this way)
                     if (Array.isArray(arch.features)) {
                         arch.features.forEach(feat => {
                             let featHtml = '';
@@ -252,14 +258,11 @@ async function viewDetails(route, identifier) {
                         });
                     }
                     
-                    // 4. Fallback: scan for any other string field containing markdown-like content
                     Object.entries(arch).forEach(([key, value]) => {
                         if (typeof value === 'string' && 
                             value.trim().length > 20 && 
                             (value.includes('#####') || value.includes('Starting at') || value.includes('level')) &&
                             key !== 'desc' && key !== 'table' && key !== 'name' && key !== 'slug') {
-                            // Optional: show which field was caught for debugging
-                            // archHtml += `<div style="color: #666; font-size: 0.9em; margin: 8px 0;">(from ${key})</div>`;
                             archHtml += marked.parse(value);
                         }
                     });
@@ -273,9 +276,6 @@ async function viewDetails(route, identifier) {
         // Main Race display logic    
         else if (route === "races") {
             let allContent = "";
-        
-            // Debug line (remove later if desired)
-            allContent += `<p style="color: red; font-weight: bold;">DEBUG: Subraces found: ${data.subraces?.length || 0}</p>`;
         
             if (data.desc) {
                 allContent += `<section>${marked.parse(data.desc)}</section>`;
@@ -303,7 +303,6 @@ async function viewDetails(route, identifier) {
                 allContent += `<section><h3>Racial Traits</h3>${marked.parse(data.traits)}</section>`;
             }
         
-            // Subraces
             if (Array.isArray(data.subraces) && data.subraces.length > 0) {
                 allContent += `<h2>Subraces</h2>`;
                 data.subraces.forEach(sub => {
@@ -322,6 +321,11 @@ async function viewDetails(route, identifier) {
             contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
         }
         
+        // Default / fallback for other categories
+        else {
+            contentHtml += `<div class="description-block">${marked.parse(data.desc || "<p>No description available.</p>")}</div>`;
+        }
+
         modalBody.innerHTML = contentHtml;
     } catch (e) { 
         console.error("Fetch error:", e);
