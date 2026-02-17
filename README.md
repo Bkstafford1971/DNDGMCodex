@@ -4,7 +4,7 @@ A clean, fast, offline-capable **Dungeon Master's reference tool** built with va
 Browse 5th Edition rules, classes, races, spells, monsters, magic items, feats, combat mechanics, conditions, and more — all in one elegant interface.
 
 <!-- ![D&D Master Codex Screenshot](https://via.placeholder.com/1280x720/1a1a1a/ffffff?text=D%26D+Master+Codex+Interface)   --> 
-*(replace with real screenshot when you have one)*
+<!-- *(replace with real screenshot when you have one)*  --> 
 
 ## Features
 
