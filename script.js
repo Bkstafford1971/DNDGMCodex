@@ -152,7 +152,6 @@ async function viewDetails(route, identifier) {
         let contentHtml = `<h2 class="detail-header">${data.name || data.title}</h2><hr>`;
 
         // Special logic for Rule Sections (Conditions, Combat, etc.)
-        // These use the 'desc' field for the main body of text.
         if (route === 'sections') {
             contentHtml += `<div class="description-block">${marked.parse(data.desc)}</div>`;
         } 
@@ -179,11 +178,103 @@ async function viewDetails(route, identifier) {
                     <p>${data.actions ? data.actions.map(a => `<strong>${a.name}:</strong> ${a.desc}`).join('<br><br>') : 'No actions listed.'}</p>
                 </div>`;
         }
-    // Main Race display logic    
+        // Classes display logic
+        else if (route === "classes") {
+            let allContent = "";
+        
+            // Description
+            if (data.desc) {
+                allContent += `<section>${marked.parse(data.desc)}</section>`;
+            }
+        
+            // Hit Points
+            if (data.hit_dice || data.hp_at_1st_level || data.hp_at_higher_levels) {
+                allContent += `<section><h3>Hit Points</h3>`;
+                if (data.hit_dice) allContent += `<p><strong>Hit Dice:</strong> ${data.hit_dice}</p>`;
+                if (data.hp_at_1st_level) allContent += `<p><strong>Hit Points at 1st Level:</strong> ${data.hp_at_1st_level}</p>`;
+                if (data.hp_at_higher_levels) allContent += `<p><strong>Hit Points at Higher Levels:</strong> ${data.hp_at_higher_levels}</p>`;
+                allContent += `</section>`;
+            }
+        
+            // Proficiencies
+            allContent += `<section><h3>Proficiencies</h3>`;
+            if (data.prof_armor) allContent += `<p><strong>Armor:</strong> ${data.prof_armor}</p>`;
+            if (data.prof_weapons) allContent += `<p><strong>Weapons:</strong> ${data.prof_weapons}</p>`;
+            if (data.prof_tools) allContent += `<p><strong>Tools:</strong> ${data.prof_tools}</p>`;
+            if (data.prof_saving_throws) allContent += `<p><strong>Saving Throws:</strong> ${data.prof_saving_throws}</p>`;
+            if (data.prof_skills) allContent += `<p><strong>Skills:</strong> ${data.prof_skills}</p>`;
+            allContent += `</section>`;
+        
+            // Equipment
+            if (data.equipment) {
+                allContent += `<section>${marked.parse(data.equipment)}</section>`;
+            }
+        
+            // Table (Class Features)
+            if (data.table) {
+                allContent += `<section>${marked.parse(data.table)}</section>`;
+            }
+        
+            // Spellcasting
+            if (data.spellcasting_ability) {
+                allContent += `<section><h3>Spellcasting</h3>`;
+                allContent += `<p><strong>Spellcasting Ability:</strong> ${data.spellcasting_ability}</p>`;
+                if (data.spellcasting) allContent += marked.parse(data.spellcasting);
+                allContent += `</section>`;
+            }
+        
+            // Archetypes/Subclasses – improved markdown handling
+            if (Array.isArray(data.archetypes) && data.archetypes.length > 0) {
+                allContent += `<h2>${data.subtypes_name || 'Primal Paths' || 'Archetypes'}</h2>`;
+                
+                data.archetypes.forEach(arch => {
+                    let archHtml = `<h3>${arch.name}</h3>`;
+                    
+                    // 1. Main description (usually flavor text)
+                    if (arch.desc && typeof arch.desc === 'string' && arch.desc.trim().length > 0) {
+                        archHtml += marked.parse(arch.desc);
+                    }
+                    
+                    // 2. Table field – most common location for ##### feature headings
+                    if (arch.table && typeof arch.table === 'string' && arch.table.trim().length > 0) {
+                        archHtml += marked.parse(arch.table);
+                    }
+                    
+                    // 3. If features is an array (some API responses structure it this way)
+                    if (Array.isArray(arch.features)) {
+                        arch.features.forEach(feat => {
+                            let featHtml = '';
+                            if (feat.name) featHtml += `<h4>${feat.name}</h4>`;
+                            if (feat.desc && typeof feat.desc === 'string') {
+                                featHtml += marked.parse(feat.desc);
+                            }
+                            archHtml += featHtml;
+                        });
+                    }
+                    
+                    // 4. Fallback: scan for any other string field containing markdown-like content
+                    Object.entries(arch).forEach(([key, value]) => {
+                        if (typeof value === 'string' && 
+                            value.trim().length > 20 && 
+                            (value.includes('#####') || value.includes('Starting at') || value.includes('level')) &&
+                            key !== 'desc' && key !== 'table' && key !== 'name' && key !== 'slug') {
+                            // Optional: show which field was caught for debugging
+                            // archHtml += `<div style="color: #666; font-size: 0.9em; margin: 8px 0;">(from ${key})</div>`;
+                            archHtml += marked.parse(value);
+                        }
+                    });
+                    
+                    allContent += `<section style="margin: 20px 0; padding: 15px; border: 1px solid #c9ad6a; border-radius: 6px;">${archHtml}</section>`;
+                });
+            }
+    
+            contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
+        }
+        // Main Race display logic    
         else if (route === "races") {
             let allContent = "";
         
-            // Debug line (remove later)
+            // Debug line (remove later if desired)
             allContent += `<p style="color: red; font-weight: bold;">DEBUG: Subraces found: ${data.subraces?.length || 0}</p>`;
         
             if (data.desc) {
@@ -212,7 +303,7 @@ async function viewDetails(route, identifier) {
                 allContent += `<section><h3>Racial Traits</h3>${marked.parse(data.traits)}</section>`;
             }
         
-            // Subraces – this is the key part
+            // Subraces
             if (Array.isArray(data.subraces) && data.subraces.length > 0) {
                 allContent += `<h2>Subraces</h2>`;
                 data.subraces.forEach(sub => {
@@ -220,7 +311,6 @@ async function viewDetails(route, identifier) {
                     if (sub.desc) subHtml += marked.parse(sub.desc);
                     if (sub.asi_desc) subHtml += `<p>${marked.parse(sub.asi_desc)}</p>`;
                     if (sub.traits) {
-                        // Parse traits and convert newlines/lists properly
                         subHtml += `<h4>Subrace Traits</h4>${marked.parse(sub.traits)}`;
                     }
                     allContent += `<section style="margin: 20px 0; padding: 15px; border: 1px solid #c9ad6a; border-radius: 6px;">${subHtml}</section>`;
@@ -238,9 +328,18 @@ async function viewDetails(route, identifier) {
         modalBody.innerHTML = `<p class="error">Failed to load details. The archives may be incomplete.</p>`; 
     }
 }
-function toggleSub(id) { document.getElementById(id).classList.toggle('active'); }
-function closeModal() { document.getElementById('detail-modal').style.display = "none"; }
-window.onclick = (e) => { if(e.target == document.getElementById('detail-modal')) closeModal(); }
+
+function toggleSub(id) { 
+    document.getElementById(id).classList.toggle('active'); 
+}
+
+function closeModal() { 
+    document.getElementById('detail-modal').style.display = "none"; 
+}
+
+window.onclick = (e) => { 
+    if(e.target == document.getElementById('detail-modal')) closeModal(); 
+}
 
 // --- 6. START PAGE ---
 function showStartPage() {
