@@ -160,7 +160,7 @@ async function viewDetails(route, identifier) {
                 contentParts.push(marked.parse(data.desc));
             }
 
-            // Fallback when content is missing/empty (helps debugging & UX)
+            // Fallback when content is missing/empty
             if (contentParts.length === 0) {
                 contentParts.push(
                     `<p style="color: #e67e22; font-style: italic;">` +
@@ -171,6 +171,57 @@ async function viewDetails(route, identifier) {
 
             contentHtml += `<div class="description-block">${contentParts.join('\n')}</div>`;
         } 
+        
+        // Dedicated spell display logic
+        else if (route === 'spells') {
+            let spellContent = '';
+
+            // Core casting info - stat-block style
+            spellContent += `
+                <div class="stat-block" style="margin-bottom: 1.5em;">
+                    <p><strong>Level:</strong> ${data.level || 'Cantrip'}</p>
+                    <p><strong>School:</strong> ${data.school || '—'}</p>
+                    <p><strong>Casting Time:</strong> ${data.casting_time || '—'}</p>
+                    <p><strong>Range:</strong> ${data.range || '—'}</p>
+                    <p><strong>Components:</strong> ${data.components || '—'} 
+                        ${data.material ? `(${data.material})` : ''}</p>
+                    <p><strong>Duration:</strong> ${data.duration || '—'} 
+                        ${data.requires_concentration ? '(Concentration)' : ''}</p>
+                    ${data.ritual === 'yes' || data.can_be_cast_as_ritual ? '<p><strong>Ritual:</strong> Yes</p>' : ''}
+                </div>`;
+
+            // Main description
+            if (data.desc) {
+                spellContent += `<section>${marked.parse(data.desc)}</section>`;
+            }
+
+            // Higher level / at higher levels scaling
+            if (data.higher_level) {
+                spellContent += `
+                    <section>
+                        <h3>At Higher Levels</h3>
+                        ${marked.parse(data.higher_level)}
+                    </section>`;
+            }
+
+            // Classes / spell lists
+            if (data.dnd_class || data.spell_lists?.length > 0) {
+                const classes = data.dnd_class || data.spell_lists?.join(', ') || 'Unknown';
+                spellContent += `
+                    <section>
+                        <h3>Classes</h3>
+                        <p>${classes}</p>
+                    </section>`;
+            }
+
+            // Fallback if nothing substantial
+            if (!spellContent.trim() || spellContent === '<div class="stat-block" style="margin-bottom: 1.5em;"></div>') {
+                spellContent = '<p style="color: #e67e22; font-style: italic;">No detailed spell information available in API response.</p>';
+            }
+
+            contentHtml += `<div class="description-block">${spellContent}</div>`;
+        }
+        
         // Logic for Monsters
         else if (route === 'monsters') {
             contentHtml += `
