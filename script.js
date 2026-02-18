@@ -1,6 +1,147 @@
 const API_BASE = "https://api.open5e.com";
 let currentCategory = ""; 
-let allFetchedItems = []; 
+let allFetchedItems = [];
+let spellCache = null; // Cache all spells to avoid repeated API calls 
+
+// --- SPELL CACHE SYSTEM ---
+async function getAllSpells() {
+    // Return cached spells if we already have them
+    if (spellCache) {
+        console.log('Using cached spells');
+        return spellCache;
+    }
+    
+    // Otherwise fetch all spells with parallel requests for speed
+    console.log('Fetching all spells from API...');
+    let allSpells = [];
+    
+    // First, get the first page to see how many total results there are
+    const firstResponse = await fetch(`${API_BASE}/spells/?limit=500`);
+    const firstData = await firstResponse.json();
+    allSpells = firstData.results;
+    
+    // Calculate how many more pages we need
+    const total = firstData.count;
+    const pageSize = 500;
+    const totalPages = Math.ceil(total / pageSize);
+    
+    console.log(`Total spells: ${total}, fetching ${totalPages} pages...`);
+    
+    // Fetch remaining pages in parallel for speed
+    if (totalPages > 1) {
+        const pagePromises = [];
+        for (let i = 1; i < totalPages; i++) {
+            const offset = i * pageSize;
+            pagePromises.push(
+                fetch(`${API_BASE}/spells/?limit=${pageSize}&offset=${offset}`)
+                    .then(r => r.json())
+                    .then(data => data.results)
+            );
+        }
+        
+        const remainingPages = await Promise.all(pagePromises);
+        remainingPages.forEach(pageResults => {
+            allSpells = allSpells.concat(pageResults);
+        });
+    }
+    
+    console.log(`Loaded ${allSpells.length} total spells`);
+    
+    // Deduplicate spells by slug (unique identifier)
+    const uniqueSpells = [];
+    const seenSlugs = new Set();
+    
+    allSpells.forEach(spell => {
+        if (!seenSlugs.has(spell.slug)) {
+            seenSlugs.add(spell.slug);
+            uniqueSpells.push(spell);
+        }
+    });
+    
+    console.log(`After deduplication: ${uniqueSpells.length} unique spells`);
+    spellCache = uniqueSpells; // Store deduplicated cache
+    return uniqueSpells;
+}
+
+// --- SOURCE FILTER SYSTEM ---
+function setupSourceFilter(items) {
+    const filterContainer = document.getElementById('filter-container');
+    const checkboxContainer = document.getElementById('source-checkboxes');
+    
+    if (!filterContainer || !checkboxContainer) return;
+    
+    // Get unique sources from items
+    const sources = new Set();
+    items.forEach(item => {
+        const source = item.document__title || 'SRD';
+        sources.add(source);
+    });
+    
+    // Sort sources alphabetically
+    const sortedSources = Array.from(sources).sort();
+    
+    // Create filter header with buttons
+    const headerDiv = filterContainer.querySelector('div');
+    if (headerDiv) {
+        headerDiv.innerHTML = `
+            <strong>Filter by Source:</strong>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="selectAllSources()" style="padding: 5px 10px; cursor: pointer; background: var(--deep-red); color: white; border: none; border-radius: 4px; font-size: 0.8rem;">Select All</button>
+                <button onclick="deselectAllSources()" style="padding: 5px 10px; cursor: pointer; background: #666; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">Deselect All</button>
+            </div>
+        `;
+    }
+    
+    // Create checkboxes
+    checkboxContainer.innerHTML = '';
+    sortedSources.forEach(source => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 5px; border-radius: 4px; transition: background 0.2s;';
+        label.onmouseover = () => label.style.background = 'rgba(0,0,0,0.05)';
+        label.onmouseout = () => label.style.background = 'transparent';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = source;
+        checkbox.checked = true; // All checked by default
+        checkbox.onchange = applySourceFilter;
+        checkbox.style.cursor = 'pointer';
+        
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(source));
+        checkboxContainer.appendChild(label);
+    });
+    
+    filterContainer.style.display = 'block';
+}
+
+function selectAllSources() {
+    const checkboxes = document.querySelectorAll('#source-checkboxes input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+    applySourceFilter();
+}
+
+function deselectAllSources() {
+    const checkboxes = document.querySelectorAll('#source-checkboxes input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = false);
+    applySourceFilter();
+}
+
+function applySourceFilter() {
+    const checkboxes = document.querySelectorAll('#source-checkboxes input[type="checkbox"]');
+    const selectedSources = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    
+    // Filter allFetchedItems based on selected sources
+    const filtered = allFetchedItems.filter(item => {
+        const source = item.document__title || 'SRD';
+        return selectedSources.includes(source);
+    });
+    
+    // Re-render with filtered items
+    renderResults(filtered, currentCategory, null, null);
+}
 
 // --- 1. CORE FETCHING ---
 async function fetchData(target) {
@@ -22,23 +163,83 @@ async function fetchData(target) {
     }
 
     try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        // Use data.feats for local file, data.results for API
-        allFetchedItems = data.feats ? data.feats : data.results;
+        // Special handling for spells - use cache system
+        if (target === 'spells') {
+            const allSpells = await getAllSpells();
+            
+            // Sort by level
+            const sortedSpells = [...allSpells].sort((a, b) => {
+                const levelA = a.level === 'Cantrip' ? 0 : parseInt(a.level) || 0;
+                const levelB = b.level === 'Cantrip' ? 0 : parseInt(b.level) || 0;
+                if (levelA !== levelB) return levelA - levelB;
+                return a.name.localeCompare(b.name);
+            });
+            
+            allFetchedItems = sortedSpells;
+            renderResults(allFetchedItems, currentCategory, null, null);
+            setupSourceFilter(allFetchedItems);
+            if (filterUI) filterUI.style.display = 'block';
+        } else {
+            // Standard single-page fetch for other categories
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            // Use data.feats for local file, data.results for API
+            allFetchedItems = data.feats ? data.feats : data.results;
 
-        if (filterUI) {
-            filterUI.style.display = currentCategory.includes('spells') ? 'block' : 'none';
+            if (filterUI) {
+                filterUI.style.display = currentCategory.includes('spells') ? 'block' : 'none';
+            }
+
+            renderResults(allFetchedItems, currentCategory, data.next, data.previous);
         }
-
-        renderResults(allFetchedItems, currentCategory, data.next, data.previous);
     } catch (error) {
         display.innerHTML = `<p class="error">Failed to summon data from ${url}.</p>`;
     }
 }
 
-// --- 2. SEARCH LOGIC ---
+// --- 2. CLASS-SPECIFIC SPELL FILTERING ---
+async function fetchSpellsByClass(className) {
+    const display = document.getElementById('display-area');
+    const filterUI = document.getElementById('filter-container');
+    display.innerHTML = '<div class="loader">Consulting the archives...</div>';
+    
+    currentCategory = `spells-${className.toLowerCase()}`;
+    
+    try {
+        // Use cached spell system
+        const allSpells = await getAllSpells();
+        
+        // Filter spells that include this class
+        // The API stores classes as a string like "Bard, Sorcerer, Wizard"
+        const classSpells = allSpells.filter(spell => {
+            if (!spell.dnd_class) return false;
+            // Check if the class name appears in the dnd_class string
+            return spell.dnd_class.toLowerCase().includes(className.toLowerCase());
+        });
+        
+        // Sort by level
+        classSpells.sort((a, b) => {
+            const levelA = a.level === 'Cantrip' ? 0 : parseInt(a.level) || 0;
+            const levelB = b.level === 'Cantrip' ? 0 : parseInt(b.level) || 0;
+            if (levelA !== levelB) return levelA - levelB;
+            return a.name.localeCompare(b.name);
+        });
+        
+        allFetchedItems = classSpells;
+
+        renderResults(allFetchedItems, `${className} Spells`, null, null);
+        setupSourceFilter(allFetchedItems);
+        if (filterUI) {
+            filterUI.style.display = 'block';
+        }
+    } catch (error) {
+        display.innerHTML = `<p class="error">Failed to summon ${className} spells from the archives.</p>`;
+        console.error('Error fetching spells:', error);
+    }
+}
+
+// --- 3. SEARCH LOGIC ---
 async function handleSearch(event) {
     const query = event.target.value.toLowerCase();
     const filterUI = document.getElementById('filter-container');
@@ -55,7 +256,7 @@ async function handleSearch(event) {
     } catch (e) { console.error("Search failed", e); }
 }
 
-// --- 3. RENDERING ENGINE ---
+// --- 4. RENDERING ENGINE ---
 function renderResults(items, category, nextUrl, prevUrl) {
     const display = document.getElementById('display-area');
     let displayTitle = category.replace(/-/g, ' ').split('?')[0];
@@ -67,9 +268,15 @@ function renderResults(items, category, nextUrl, prevUrl) {
         return;
     }
 
+    // Add count for spells
+    const cat = category.toLowerCase();
+    if (cat.includes('spells')) {
+        html += `<p style="color: #666; font-style: italic; margin-bottom: 15px;">Total Spells: ${items.length}</p>`;
+    }
+
     let tableHeader = "";
     let tableRows = "";
-    const cat = category.toLowerCase();
+
 
     // Custom Table for local Feats
     if (cat === 'feats') {
@@ -81,6 +288,40 @@ function renderResults(items, category, nextUrl, prevUrl) {
                 <td class="source-tag">${item.source}</td>
             </tr>`).join('');
     } 
+    // Spell Table (with Level column and grouping)
+    else if (cat.includes('spells')) {
+        // Group spells by level for better organization
+        let currentLevel = null;
+        let groupedRows = '';
+        
+        items.forEach((item, index) => {
+            const level = item.level === 'Cantrip' ? 0 : parseInt(item.level) || 0;
+            const levelDisplay = item.level === 'Cantrip' ? 'Cantrip' : `Level ${item.level}`;
+            
+            // Add level header row when level changes
+            if (currentLevel !== level) {
+                currentLevel = level;
+                const headerText = item.level === 'Cantrip' ? 'CANTRIPS' : `LEVEL ${item.level} SPELLS`;
+                groupedRows += `
+                    <tr style="background: var(--deep-red); pointer-events: none;">
+                        <td colspan="4" style="color: white; font-weight: bold; text-align: center; padding: 10px; letter-spacing: 2px;">
+                            ${headerText}
+                        </td>
+                    </tr>`;
+            }
+            
+            groupedRows += `
+            <tr onclick="viewDetails('spells', '${item.slug}')">
+                <td><strong>${item.name}</strong></td>
+                <td class="cell-bold">${levelDisplay}</td>
+                <td>${item.school || '—'}</td>
+                <td class="source-tag">${item.document__title || "SRD"}</td>
+            </tr>`;
+        });
+        
+        tableHeader = `<tr><th>Name</th><th>Level</th><th>School</th><th>Source</th></tr>`;
+        tableRows = groupedRows;
+    }
     // Monster Table
     else if (cat.includes('monsters')) {
         tableHeader = `<tr><th>Name</th><th>Type</th><th>Size</th><th>Source</th></tr>`;
@@ -92,7 +333,7 @@ function renderResults(items, category, nextUrl, prevUrl) {
                 <td class="source-tag">${item.document__title || "SRD"}</td>
             </tr>`).join('');
     }
-    // Standard Tables (Items, Spells, etc.)
+    // Standard Tables (Items, etc.)
     else {
         tableHeader = `<tr><th>Name</th><th>Details</th><th>Source</th></tr>`;
         tableRows = items.map(item => `
@@ -116,7 +357,7 @@ function renderResults(items, category, nextUrl, prevUrl) {
     display.innerHTML = html;
 }
 
-// --- 4. DETAIL MODAL ---
+// --- 5. DETAIL MODAL ---
 async function viewDetails(route, identifier) {
     const modal = document.getElementById('detail-modal');
     const modalBody = document.getElementById('modal-body');
@@ -396,7 +637,7 @@ window.onclick = (e) => {
     if(e.target == document.getElementById('detail-modal')) closeModal(); 
 }
 
-// --- 6. START PAGE ---
+// --- 7. START PAGE ---
 function showStartPage() {
     const display = document.getElementById('display-area');
     const filterUI = document.getElementById('filter-container');
@@ -416,6 +657,10 @@ function showStartPage() {
             <h1>The Dungeon Masters Codex</h1>
             <p class="subtitle">The archives are at your command. Select a category from the sidebar to begin your session.</p>
             
+            <div id="spell-status" style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-style: italic; color: #666;">
+                <span id="spell-load-indicator">⏳ Loading spell database in background...</span>
+            </div>
+            
             <div class="session-note">
                 <p><em>"The evening is young, and the dungeon is deep. May your natural 20s be many."</em></p>
             </div>
@@ -425,4 +670,23 @@ function showStartPage() {
 
 window.onload = () => {
     showStartPage();
+    
+    // Preload spells in the background for faster access
+    console.log('Preloading spell database...');
+    getAllSpells().then(() => {
+        console.log('Spell database ready!');
+        // Update the status indicator if it exists
+        const indicator = document.getElementById('spell-load-indicator');
+        if (indicator) {
+            indicator.innerHTML = '✅ Spell database loaded! Instant spell lists ready.';
+            indicator.style.color = '#228b22';
+        }
+    }).catch(err => {
+        console.error('Failed to preload spells:', err);
+        const indicator = document.getElementById('spell-load-indicator');
+        if (indicator) {
+            indicator.innerHTML = '⚠️ Spell preload failed. Lists will load on demand.';
+            indicator.style.color = '#e67e22';
+        }
+    });
 };
