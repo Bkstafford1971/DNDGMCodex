@@ -138,6 +138,22 @@ body {
     letter-spacing: 1px;
 }
 
+/* Sortable column styling */
+.magic-item-table th[onclick] {
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.magic-item-table th[onclick]:hover {
+    background: #7a1f11;
+}
+
+.sort-indicator {
+    opacity: 0.4;
+    font-size: 0.9rem;
+    margin-left: 5px;
+}
+
 .magic-item-table td {
     padding: 12px 15px;
     border-bottom: 1px solid #eee;

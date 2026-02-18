@@ -2,6 +2,76 @@ const API_BASE = "https://api.open5e.com";
 let currentCategory = ""; 
 let allFetchedItems = [];
 let spellCache = null; // Cache all spells to avoid repeated API calls 
+let magicItemsCache = null; // Cache all magic items
+
+// NEW for client-side pagination
+let currentPage = 1;
+const PAGE_SIZE = 50; // or whatever feels right
+let paginatedItems = []; // Store the current paginated subset
+
+// Filter state
+let currentRarityFilter = 'all';
+let currentTypeFilter = 'all';
+
+// --- MAGIC ITEMS CACHE SYSTEM ---
+async function getAllMagicItems() {
+    // Return cached magic items if we already have them
+    if (magicItemsCache) {
+        console.log('Using cached magic items');
+        return magicItemsCache;
+    }
+    
+    // Otherwise fetch all magic items with parallel requests for speed
+    console.log('Fetching all magic items from API...');
+    let allMagicItems = [];
+    
+    // First, get the first page to see how many total results there are
+    const firstResponse = await fetch(`${API_BASE}/magicitems/?limit=500`);
+    const firstData = await firstResponse.json();
+    allMagicItems = firstData.results;
+    
+    // Calculate how many more pages we need
+    const total = firstData.count;
+    const pageSize = 500;
+    const totalPages = Math.ceil(total / pageSize);
+    
+    console.log(`Total magic items: ${total}, fetching ${totalPages} pages...`);
+    
+    // Fetch remaining pages in parallel for speed
+    if (totalPages > 1) {
+        const pagePromises = [];
+        for (let i = 1; i < totalPages; i++) {
+            const offset = i * pageSize;
+            pagePromises.push(
+                fetch(`${API_BASE}/magicitems/?limit=${pageSize}&offset=${offset}`)
+                    .then(r => r.json())
+                    .then(data => data.results)
+            );
+        }
+        
+        const remainingPages = await Promise.all(pagePromises);
+        remainingPages.forEach(pageResults => {
+            allMagicItems = allMagicItems.concat(pageResults);
+        });
+    }
+    
+    console.log(`Loaded ${allMagicItems.length} total magic items`);
+    
+    // Deduplicate magic items by slug (unique identifier)
+    const uniqueItems = [];
+    const seenSlugs = new Set();
+    
+    allMagicItems.forEach(item => {
+        if (!seenSlugs.has(item.slug)) {
+            seenSlugs.add(item.slug);
+            uniqueItems.push(item);
+        }
+    });
+    
+    console.log(`After deduplication: ${uniqueItems.length} unique magic items`);
+    magicItemsCache = uniqueItems; // Store deduplicated cache
+    return uniqueItems;
+}
 
 // --- SPELL CACHE SYSTEM ---
 async function getAllSpells() {
@@ -63,7 +133,127 @@ async function getAllSpells() {
     return uniqueSpells;
 }
 
-// --- SOURCE FILTER SYSTEM ---
+// --- MAGIC ITEMS FILTER SYSTEM ---
+function setupMagicItemFilters(items) {
+    const filterContainer = document.getElementById('filter-container');
+    
+    if (!filterContainer) return;
+    
+    // Get unique rarities and types from ALL items
+    const rarities = new Set();
+    const types = new Set();
+    
+    items.forEach(item => {
+        if (item.rarity) {
+            // Normalize rarity strings (handle "Very Rare", etc.)
+            const rarity = item.rarity.toLowerCase().trim();
+            rarities.add(rarity);
+        }
+        if (item.type) {
+            types.add(item.type);
+        }
+    });
+    
+    // Sort alphabetically with custom order for rarity
+    const rarityOrder = ['common', 'uncommon', 'rare', 'very rare', 'legendary', 'artifact'];
+    const sortedRarities = Array.from(rarities).sort((a, b) => {
+        const indexA = rarityOrder.indexOf(a);
+        const indexB = rarityOrder.indexOf(b);
+        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+    });
+    
+    const sortedTypes = Array.from(types).sort();
+    
+    // Create filter UI
+    filterContainer.innerHTML = `
+        <div style="margin-bottom: 15px;">
+            <strong style="display: block; margin-bottom: 10px;">Filter Magic Items:</strong>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Rarity:</label>
+                    <select id="rarity-filter" onchange="applyMagicItemFilters()" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="all">All Rarities</option>
+                        ${sortedRarities.map(r => `<option value="${r}">${r.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Type:</label>
+                    <select id="type-filter" onchange="applyMagicItemFilters()" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="all">All Types</option>
+                        ${sortedTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button onclick="clearMagicItemFilters()" style="padding: 8px 15px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear Filters</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Restore previous filter selections if they exist
+    const raritySelect = document.getElementById('rarity-filter');
+    const typeSelect = document.getElementById('type-filter');
+    
+    if (raritySelect && currentRarityFilter !== 'all') {
+        raritySelect.value = currentRarityFilter;
+    }
+    if (typeSelect && currentTypeFilter !== 'all') {
+        typeSelect.value = currentTypeFilter;
+    }
+    
+    filterContainer.style.display = 'block';
+}
+
+function applyMagicItemFilters() {
+    const raritySelect = document.getElementById('rarity-filter');
+    const typeSelect = document.getElementById('type-filter');
+    
+    currentRarityFilter = raritySelect ? raritySelect.value : 'all';
+    currentTypeFilter = typeSelect ? typeSelect.value : 'all';
+    
+    // Reset to first page when filtering
+    currentPage = 1;
+    
+    // Apply filters to ALL items and re-render
+    const filtered = filterMagicItems(allFetchedItems);
+    renderResults(filtered, 'Magic Items', null, null);
+}
+
+function clearMagicItemFilters() {
+    const raritySelect = document.getElementById('rarity-filter');
+    const typeSelect = document.getElementById('type-filter');
+    
+    if (raritySelect) raritySelect.value = 'all';
+    if (typeSelect) typeSelect.value = 'all';
+    
+    currentRarityFilter = 'all';
+    currentTypeFilter = 'all';
+    currentPage = 1;
+    
+    renderResults(allFetchedItems, 'Magic Items', null, null);
+}
+
+function filterMagicItems(items) {
+    return items.filter(item => {
+        // Apply rarity filter
+        if (currentRarityFilter !== 'all') {
+            const itemRarity = (item.rarity || '').toLowerCase().trim();
+            if (itemRarity !== currentRarityFilter) return false;
+        }
+        
+        // Apply type filter
+        if (currentTypeFilter !== 'all') {
+            if (item.type !== currentTypeFilter) return false;
+        }
+        
+        return true;
+    });
+}
+
+// --- SOURCE FILTER SYSTEM (for spells) ---
 function setupSourceFilter(items) {
     const filterContainer = document.getElementById('filter-container');
     const checkboxContainer = document.getElementById('source-checkboxes');
@@ -139,8 +329,81 @@ function applySourceFilter() {
         return selectedSources.includes(source);
     });
     
+    // Reset to first page when filtering
+    currentPage = 1;
+    
     // Re-render with filtered items
     renderResults(filtered, currentCategory, null, null);
+}
+
+// --- PAGINATION FUNCTIONS ---
+function getPaginatedItems(items) {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return items.slice(start, end);
+}
+
+function renderPaginationControls(totalItems) {
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    
+    if (totalPages <= 1) return '';
+    
+    let paginationHtml = `
+        <div class="pagination-controls" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin: 20px 0;">
+            <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
+                style="padding: 8px 15px; background: var(--deep-red); color: white; border: none; border-radius: 4px; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'}; opacity: ${currentPage === 1 ? '0.5' : '1'};">← Previous</button>
+            <span>Page ${currentPage} of ${totalPages} (${totalItems} items)</span>
+            <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} 
+                style="padding: 8px 15px; background: var(--deep-red); color: white; border: none; border-radius: 4px; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'}; opacity: ${currentPage === totalPages ? '0.5' : '1'};">Next →</button>
+        </div>
+    `;
+    
+    // Add page number buttons for easier navigation
+    if (totalPages > 1) {
+        paginationHtml += `<div style="display: flex; justify-content: center; gap: 5px; margin-bottom: 20px; flex-wrap: wrap;">`;
+        
+        // Show first page
+        if (currentPage > 3) {
+            paginationHtml += `<button onclick="changePage(1)" style="padding: 5px 10px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">1</button>`;
+            if (currentPage > 4) {
+                paginationHtml += `<span style="padding: 5px;">...</span>`;
+            }
+        }
+        
+        // Show pages around current page
+        for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+            paginationHtml += `<button onclick="changePage(${i})" style="padding: 5px 10px; background: ${i === currentPage ? 'var(--deep-red)' : '#f0f0f0'}; color: ${i === currentPage ? 'white' : 'black'}; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">${i}</button>`;
+        }
+        
+        // Show last page
+        if (currentPage < totalPages - 2) {
+            if (currentPage < totalPages - 3) {
+                paginationHtml += `<span style="padding: 5px;">...</span>`;
+            }
+            paginationHtml += `<button onclick="changePage(${totalPages})" style="padding: 5px 10px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; cursor: pointer;">${totalPages}</button>`;
+        }
+        
+        paginationHtml += `</div>`;
+    }
+    
+    return paginationHtml;
+}
+
+function changePage(newPage) {
+    // Get the currently filtered items
+    const filteredItems = currentCategory.includes('magicitems') ? 
+        filterMagicItems(allFetchedItems) : allFetchedItems;
+    const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+    
+    if (newPage < 1 || newPage > totalPages) return;
+    
+    currentPage = newPage;
+    
+    // Re-render with current filters and new page
+    renderResults(filteredItems, currentCategory === 'magicitems' ? 'Magic Items' : currentCategory, null, null);
+    
+    // Scroll to top of results smoothly
+    document.getElementById('display-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // --- 1. CORE FETCHING ---
@@ -150,7 +413,13 @@ async function fetchData(target) {
     display.innerHTML = '<div class="loader">Consulting the archives...</div>';
     
     let url;
-    currentCategory = target; 
+    currentCategory = target;
+    currentSort = { column: null, ascending: true }; // Reset sort when changing categories 
+    currentPage = 1; // Reset to first page when changing categories
+    
+    // Reset filters
+    currentRarityFilter = 'all';
+    currentTypeFilter = 'all';
 
     // Redirect "feats" to your local JSON file
     if (target === 'feats') {
@@ -176,10 +445,28 @@ async function fetchData(target) {
             });
             
             allFetchedItems = sortedSpells;
-            renderResults(allFetchedItems, currentCategory, null, null);
+            renderResults(allFetchedItems, 'Spells', null, null);
             setupSourceFilter(allFetchedItems);
             if (filterUI) filterUI.style.display = 'block';
-        } else {
+        } 
+        // Special handling for magic items - use cache system
+        else if (target === 'magicitems') {
+            const allMagicItems = await getAllMagicItems();
+            
+            // Sort by name by default
+            const sortedItems = [...allMagicItems].sort((a, b) => 
+                (a.name || '').localeCompare(b.name || '')
+            );
+            
+            allFetchedItems = sortedItems;
+            
+            // Setup magic item filters using ALL items
+            setupMagicItemFilters(allFetchedItems);
+            if (filterUI) filterUI.style.display = 'block';
+            
+            renderResults(allFetchedItems, 'Magic Items', null, null);
+        }
+        else {
             // Standard single-page fetch for other categories
             const response = await fetch(url);
             const data = await response.json();
@@ -188,10 +475,10 @@ async function fetchData(target) {
             allFetchedItems = data.feats ? data.feats : data.results;
 
             if (filterUI) {
-                filterUI.style.display = currentCategory.includes('spells') ? 'block' : 'none';
+                filterUI.style.display = target.includes('spells') ? 'block' : 'none';
             }
 
-            renderResults(allFetchedItems, currentCategory, data.next, data.previous);
+            renderResults(allFetchedItems, target, data.next, data.previous);
         }
     } catch (error) {
         display.innerHTML = `<p class="error">Failed to summon data from ${url}.</p>`;
@@ -205,6 +492,8 @@ async function fetchSpellsByClass(className) {
     display.innerHTML = '<div class="loader">Consulting the archives...</div>';
     
     currentCategory = `spells-${className.toLowerCase()}`;
+    currentSort = { column: null, ascending: true }; // Reset sort when changing categories
+    currentPage = 1; // Reset to first page
     
     try {
         // Use cached spell system
@@ -246,6 +535,8 @@ async function handleSearch(event) {
     if (query.length < 2) return;
 
     currentCategory = "monsters"; 
+    currentPage = 1; // Reset to first page for search results
+    
     try {
         const response = await fetch(`${API_BASE}/monsters/?search=${query}&limit=100`);
         const data = await response.json();
@@ -259,7 +550,7 @@ async function handleSearch(event) {
 // --- 4. RENDERING ENGINE ---
 function renderResults(items, category, nextUrl, prevUrl) {
     const display = document.getElementById('display-area');
-    let displayTitle = category.replace(/-/g, ' ').split('?')[0];
+    let displayTitle = category;
     let html = `<h1>${displayTitle.toUpperCase()}</h1>`;
     
     if (!items || items.length === 0) {
@@ -268,20 +559,47 @@ function renderResults(items, category, nextUrl, prevUrl) {
         return;
     }
 
-    // Add count for spells
+    // Determine which items to display (apply filters for magic items)
+    let itemsToDisplay = items;
     const cat = category.toLowerCase();
-    if (cat.includes('spells')) {
+    
+    // For magic items, we're already receiving the filtered items from applyMagicItemFilters
+    // But we need to apply pagination to the filtered set
+    if (cat.includes('magic items') || currentCategory === 'magicitems') {
+        // Add count of filtered items
+        html += `<p style="color: #666; font-style: italic; margin-bottom: 15px;">Total Items: ${items.length}</p>`;
+        
+        // Show active filters
+        if (currentRarityFilter !== 'all' || currentTypeFilter !== 'all') {
+            html += `<p style="color: #666; margin-bottom: 10px;">`;
+            html += `Filtered by: `;
+            if (currentRarityFilter !== 'all') {
+                const rarityDisplay = currentRarityFilter.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ');
+                html += `Rarity: ${rarityDisplay} `;
+            }
+            if (currentTypeFilter !== 'all') html += `Type: ${currentTypeFilter} `;
+            html += `(<a href="#" onclick="clearMagicItemFilters(); return false;" style="color: var(--deep-red);">clear</a>)`;
+            html += `</p>`;
+        }
+        
+        // Apply pagination to filtered items
+        if (items.length > PAGE_SIZE) {
+            itemsToDisplay = getPaginatedItems(items);
+            html += `<p style="color: #666; margin-bottom: 10px;">Showing ${itemsToDisplay.length} of ${items.length} items</p>`;
+        }
+    } else if (cat.includes('spells')) {
         html += `<p style="color: #666; font-style: italic; margin-bottom: 15px;">Total Spells: ${items.length}</p>`;
     }
 
     let tableHeader = "";
     let tableRows = "";
 
-
     // Custom Table for local Feats
     if (cat === 'feats') {
         tableHeader = `<tr><th>Name</th><th>Prerequisite</th><th>Source</th></tr>`;
-        tableRows = items.map(item => `
+        tableRows = itemsToDisplay.map(item => `
             <tr onclick="viewDetails('local-feats', '${item.name.replace(/'/g, "\\'")}')">
                 <td><strong>${item.name}</strong></td>
                 <td>${item.prerequisites || 'None'}</td>
@@ -290,42 +608,70 @@ function renderResults(items, category, nextUrl, prevUrl) {
     } 
     // Spell Table (with Level column and grouping)
     else if (cat.includes('spells')) {
-        // Group spells by level for better organization
-        let currentLevel = null;
-        let groupedRows = '';
+        // Check if we should show grouping (only if not sorted by user)
+        const showGrouping = !currentSort.column;
         
-        items.forEach((item, index) => {
-            const level = item.level === 'Cantrip' ? 0 : parseInt(item.level) || 0;
-            const levelDisplay = item.level === 'Cantrip' ? 'Cantrip' : `Level ${item.level}`;
+        if (showGrouping) {
+            // Group spells by level for better organization
+            let currentLevel = null;
+            let groupedRows = '';
             
-            // Add level header row when level changes
-            if (currentLevel !== level) {
-                currentLevel = level;
-                const headerText = item.level === 'Cantrip' ? 'CANTRIPS' : `LEVEL ${item.level} SPELLS`;
+            itemsToDisplay.forEach((item, index) => {
+                const level = item.level === 'Cantrip' ? 0 : parseInt(item.level) || 0;
+                const levelDisplay = item.level === 'Cantrip' ? 'Cantrip' : `Level ${item.level}`;
+                
+                // Add level header row when level changes
+                if (currentLevel !== level) {
+                    currentLevel = level;
+                    const headerText = item.level === 'Cantrip' ? 'CANTRIPS' : `LEVEL ${item.level} SPELLS`;
+                    groupedRows += `
+                        <tr style="background: var(--deep-red); pointer-events: none;">
+                            <td colspan="4" style="color: white; font-weight: bold; text-align: center; padding: 10px; letter-spacing: 2px;">
+                                ${headerText}
+                            </td>
+                        </tr>`;
+                }
+                
                 groupedRows += `
-                    <tr style="background: var(--deep-red); pointer-events: none;">
-                        <td colspan="4" style="color: white; font-weight: bold; text-align: center; padding: 10px; letter-spacing: 2px;">
-                            ${headerText}
-                        </td>
-                    </tr>`;
-            }
+                <tr onclick="viewDetails('spells', '${item.slug}')">
+                    <td><strong>${item.name}</strong></td>
+                    <td class="cell-bold">${levelDisplay}</td>
+                    <td>${item.school || '—'}</td>
+                    <td class="source-tag">${item.document__title || "SRD"}</td>
+                </tr>`;
+            });
             
-            groupedRows += `
-            <tr onclick="viewDetails('spells', '${item.slug}')">
-                <td><strong>${item.name}</strong></td>
-                <td class="cell-bold">${levelDisplay}</td>
-                <td>${item.school || '—'}</td>
-                <td class="source-tag">${item.document__title || "SRD"}</td>
+            tableHeader = `<tr>
+                <th onclick="sortTableSpells('name')" style="cursor: pointer;">Name <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('level')" style="cursor: pointer;">Level <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('school')" style="cursor: pointer;">School <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('source')" style="cursor: pointer;">Source <span class="sort-indicator">↕</span></th>
             </tr>`;
-        });
-        
-        tableHeader = `<tr><th>Name</th><th>Level</th><th>School</th><th>Source</th></tr>`;
-        tableRows = groupedRows;
+            tableRows = groupedRows;
+        } else {
+            // No grouping when user is actively sorting
+            tableHeader = `<tr>
+                <th onclick="sortTableSpells('name')" style="cursor: pointer;">Name <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('level')" style="cursor: pointer;">Level <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('school')" style="cursor: pointer;">School <span class="sort-indicator">↕</span></th>
+                <th onclick="sortTableSpells('source')" style="cursor: pointer;">Source <span class="sort-indicator">↕</span></th>
+            </tr>`;
+            tableRows = itemsToDisplay.map(item => {
+                const levelDisplay = item.level === 'Cantrip' ? 'Cantrip' : `Level ${item.level}`;
+                return `
+                <tr onclick="viewDetails('spells', '${item.slug}')">
+                    <td><strong>${item.name}</strong></td>
+                    <td class="cell-bold">${levelDisplay}</td>
+                    <td>${item.school || '—'}</td>
+                    <td class="source-tag">${item.document__title || "SRD"}</td>
+                </tr>`;
+            }).join('');
+        }
     }
     // Monster Table
     else if (cat.includes('monsters')) {
         tableHeader = `<tr><th>Name</th><th>Type</th><th>Size</th><th>Source</th></tr>`;
-        tableRows = items.map(item => `
+        tableRows = itemsToDisplay.map(item => `
             <tr onclick="viewDetails('monsters', '${item.slug}')">
                 <td><strong>${item.name}</strong></td>
                 <td>${item.type}</td>
@@ -333,11 +679,35 @@ function renderResults(items, category, nextUrl, prevUrl) {
                 <td class="source-tag">${item.document__title || "SRD"}</td>
             </tr>`).join('');
     }
-    // Standard Tables (Items, etc.)
+    // Magic Items Table (with Rarity and sortable columns)
+    else if (cat.includes('magic items') || currentCategory === 'magicitems') {
+        tableHeader = `<tr>
+            <th onclick="sortTable('name')" style="cursor: pointer;">Name <span class="sort-indicator">↕</span></th>
+            <th onclick="sortTable('type')" style="cursor: pointer;">Type <span class="sort-indicator">↕</span></th>
+            <th onclick="sortTable('rarity')" style="cursor: pointer;">Rarity <span class="sort-indicator">↕</span></th>
+            <th onclick="sortTable('source')" style="cursor: pointer;">Source <span class="sort-indicator">↕</span></th>
+        </tr>`;
+        tableRows = itemsToDisplay.map(item => {
+            // Format rarity for display
+            const rarityDisplay = item.rarity ? 
+                item.rarity.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ') : 'Unknown';
+            
+            return `
+            <tr onclick="viewDetails('magicitems', '${item.slug}')">
+                <td><strong>${item.name}</strong></td>
+                <td>${item.type || '—'}</td>
+                <td>${rarityDisplay}</td>
+                <td class="source-tag">${item.document__title || "SRD"}</td>
+            </tr>`;
+        }).join('');
+    }
+    // Standard Tables (Weapons, Armor, etc.)
     else {
         tableHeader = `<tr><th>Name</th><th>Details</th><th>Source</th></tr>`;
-        tableRows = items.map(item => `
-            <tr onclick="viewDetails('${cat}', '${item.slug}')">
+        tableRows = itemsToDisplay.map(item => `
+            <tr onclick="viewDetails('${currentCategory}', '${item.slug}')">
                 <td><strong>${item.name}</strong></td>
                 <td>${item.type || item.school || 'General'}</td>
                 <td class="source-tag">${item.document__title || "SRD"}</td>
@@ -348,6 +718,11 @@ function renderResults(items, category, nextUrl, prevUrl) {
         html += `<table class="magic-item-table"><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>`;
     }
 
+    // Add pagination controls for magic items
+    if ((cat.includes('magic items') || currentCategory === 'magicitems') && items.length > PAGE_SIZE) {
+        html += renderPaginationControls(items.length);
+    }
+
     if (nextUrl || prevUrl) {
         html += `<div class="pagination-container">
                 ${prevUrl ? `<button class="page-btn" onclick="fetchData('${prevUrl}')">← Previous</button>` : ''}
@@ -355,9 +730,173 @@ function renderResults(items, category, nextUrl, prevUrl) {
             </div>`;
     }
     display.innerHTML = html;
+    
+    // Update sort indicators if sorting is active
+    if (currentSort.column) {
+        updateSortIndicators(currentSort.column);
+    }
 }
 
-// --- 5. DETAIL MODAL ---
+// --- SORTING SYSTEM ---
+let currentSort = { column: null, ascending: true };
+
+function sortTable(column) {
+    // Toggle sort direction if clicking the same column
+    if (currentSort.column === column) {
+        currentSort.ascending = !currentSort.ascending;
+    } else {
+        currentSort.column = column;
+        currentSort.ascending = true;
+    }
+    
+    // Sort allFetchedItems based on the column
+    const sorted = [...allFetchedItems].sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'name':
+                valueA = (a.name || '').toLowerCase();
+                valueB = (b.name || '').toLowerCase();
+                break;
+            case 'type':
+                valueA = (a.type || '').toLowerCase();
+                valueB = (b.type || '').toLowerCase();
+                break;
+            case 'rarity':
+                // Custom rarity order
+                const rarityOrder = { 
+                    'common': 1, 
+                    'uncommon': 2, 
+                    'rare': 3, 
+                    'very rare': 4, 
+                    'legendary': 5, 
+                    'artifact': 6
+                };
+                valueA = rarityOrder[(a.rarity || '').toLowerCase().trim()] || 99;
+                valueB = rarityOrder[(b.rarity || '').toLowerCase().trim()] || 99;
+                break;
+            case 'source':
+                valueA = (a.document__title || 'SRD').toLowerCase();
+                valueB = (b.document__title || 'SRD').toLowerCase();
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (column === 'rarity') {
+            // For rarity, we use numeric comparison
+            comparison = valueA - valueB;
+        } else {
+            // For strings, use localeCompare
+            comparison = valueA.localeCompare(valueB);
+        }
+        
+        return currentSort.ascending ? comparison : -comparison;
+    });
+    
+    // Update allFetchedItems with sorted array
+    allFetchedItems = sorted;
+    
+    // Reset to first page when sorting
+    currentPage = 1;
+    
+    // Apply current filters to sorted items and render
+    if (currentCategory === 'magicitems') {
+        const filtered = filterMagicItems(allFetchedItems);
+        renderResults(filtered, 'Magic Items', null, null);
+    } else {
+        renderResults(allFetchedItems, currentCategory, null, null);
+    }
+    
+    // Update sort indicators in table headers
+    updateSortIndicators(column);
+}
+
+function updateSortIndicators(activeColumn) {
+    const headers = document.querySelectorAll('.magic-item-table th[onclick]');
+    headers.forEach(header => {
+        const indicator = header.querySelector('.sort-indicator');
+        if (indicator) {
+            const match = header.getAttribute('onclick').match(/sortTable(?:Spells)?\('(.+?)'\)/);
+            if (match) {
+                const columnName = match[1];
+                if (columnName === activeColumn) {
+                    indicator.textContent = currentSort.ascending ? '↑' : '↓';
+                    indicator.style.opacity = '1';
+                } else {
+                    indicator.textContent = '↕';
+                    indicator.style.opacity = '0.4';
+                }
+            }
+        }
+    });
+}
+
+// --- SPELL SORTING ---
+function sortTableSpells(column) {
+    // Toggle sort direction if clicking the same column
+    if (currentSort.column === column) {
+        currentSort.ascending = !currentSort.ascending;
+    } else {
+        currentSort.column = column;
+        currentSort.ascending = true;
+    }
+    
+    // Sort allFetchedItems based on the column
+    const sorted = [...allFetchedItems].sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'name':
+                valueA = (a.name || '').toLowerCase();
+                valueB = (b.name || '').toLowerCase();
+                break;
+            case 'level':
+                // Convert level to number for proper sorting
+                valueA = a.level === 'Cantrip' ? 0 : parseInt(a.level) || 0;
+                valueB = b.level === 'Cantrip' ? 0 : parseInt(b.level) || 0;
+                break;
+            case 'school':
+                valueA = (a.school || '').toLowerCase();
+                valueB = (b.school || '').toLowerCase();
+                break;
+            case 'source':
+                valueA = (a.document__title || 'SRD').toLowerCase();
+                valueB = (b.document__title || 'SRD').toLowerCase();
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (column === 'level') {
+            // For level, use numeric comparison
+            comparison = valueA - valueB;
+        } else {
+            // For strings, use localeCompare
+            comparison = valueA.localeCompare(valueB);
+        }
+        
+        return currentSort.ascending ? comparison : -comparison;
+    });
+    
+    // Update allFetchedItems with sorted array
+    allFetchedItems = sorted;
+    
+    // Reset to first page when sorting
+    currentPage = 1;
+    
+    // Re-render with sorted items
+    renderResults(sorted, currentCategory, null, null);
+    
+    // Update sort indicators in table headers
+    updateSortIndicators(column);
+}
+
+// --- 6. DETAIL MODAL ---
 async function viewDetails(route, identifier) {
     const modal = document.getElementById('detail-modal');
     const modalBody = document.getElementById('modal-body');
@@ -637,7 +1176,7 @@ window.onclick = (e) => {
     if(e.target == document.getElementById('detail-modal')) closeModal(); 
 }
 
-// --- 7. START PAGE ---
+// --- 8. START PAGE ---
 function showStartPage() {
     const display = document.getElementById('display-area');
     const filterUI = document.getElementById('filter-container');
@@ -660,6 +1199,9 @@ function showStartPage() {
             <div id="spell-status" style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-style: italic; color: #666;">
                 <span id="spell-load-indicator">⏳ Loading spell database in background...</span>
             </div>
+            <div id="magic-item-status" style="margin-top: 10px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-style: italic; color: #666;">
+                <span id="magic-item-load-indicator">⏳ Loading magic item database in background...</span>
+            </div>
             
             <div class="session-note">
                 <p><em>"The evening is young, and the dungeon is deep. May your natural 20s be many."</em></p>
@@ -675,7 +1217,6 @@ window.onload = () => {
     console.log('Preloading spell database...');
     getAllSpells().then(() => {
         console.log('Spell database ready!');
-        // Update the status indicator if it exists
         const indicator = document.getElementById('spell-load-indicator');
         if (indicator) {
             indicator.innerHTML = '✅ Spell database loaded! Instant spell lists ready.';
@@ -686,6 +1227,24 @@ window.onload = () => {
         const indicator = document.getElementById('spell-load-indicator');
         if (indicator) {
             indicator.innerHTML = '⚠️ Spell preload failed. Lists will load on demand.';
+            indicator.style.color = '#e67e22';
+        }
+    });
+    
+    // Preload magic items in the background for faster access
+    console.log('Preloading magic item database...');
+    getAllMagicItems().then(() => {
+        console.log('Magic item database ready!');
+        const indicator = document.getElementById('magic-item-load-indicator');
+        if (indicator) {
+            indicator.innerHTML = '✅ Magic item database loaded! Instant filtered lists ready.';
+            indicator.style.color = '#228b22';
+        }
+    }).catch(err => {
+        console.error('Failed to preload magic items:', err);
+        const indicator = document.getElementById('magic-item-load-indicator');
+        if (indicator) {
+            indicator.innerHTML = '⚠️ Magic item preload failed. Lists will load on demand.';
             indicator.style.color = '#e67e22';
         }
     });
