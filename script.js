@@ -21,38 +21,20 @@ async function getAllMagicItems() {
         return magicItemsCache;
     }
     
-    // Otherwise fetch all magic items with parallel requests for speed
+    // Fetch all magic items by following the 'next' URL chain
+    // (the API uses page-based pagination, not offset-based)
     console.log('Fetching all magic items from API...');
     let allMagicItems = [];
-    
-    // First, get the first page to see how many total results there are
-    const firstResponse = await fetch(`${API_BASE}/magicitems/?limit=500`);
-    const firstData = await firstResponse.json();
-    allMagicItems = firstData.results;
-    
-    // Calculate how many more pages we need
-    const total = firstData.count;
-    const pageSize = 500;
-    const totalPages = Math.ceil(total / pageSize);
-    
-    console.log(`Total magic items: ${total}, fetching ${totalPages} pages...`);
-    
-    // Fetch remaining pages in parallel for speed
-    if (totalPages > 1) {
-        const pagePromises = [];
-        for (let i = 1; i < totalPages; i++) {
-            const offset = i * pageSize;
-            pagePromises.push(
-                fetch(`${API_BASE}/magicitems/?limit=${pageSize}&offset=${offset}`)
-                    .then(r => r.json())
-                    .then(data => data.results)
-            );
-        }
-        
-        const remainingPages = await Promise.all(pagePromises);
-        remainingPages.forEach(pageResults => {
-            allMagicItems = allMagicItems.concat(pageResults);
-        });
+    let nextUrl = `${API_BASE}/magicitems/?limit=500`;
+    let pageNum = 0;
+
+    while (nextUrl) {
+        pageNum++;
+        const response = await fetch(nextUrl);
+        const data = await response.json();
+        allMagicItems = allMagicItems.concat(data.results);
+        nextUrl = data.next; // Follow the next URL exactly as provided by the API
+        console.log(`Page ${pageNum}: fetched ${data.results.length} items (total so far: ${allMagicItems.length} / ${data.count})`);
     }
     
     console.log(`Loaded ${allMagicItems.length} total magic items`);
@@ -81,38 +63,20 @@ async function getAllSpells() {
         return spellCache;
     }
     
-    // Otherwise fetch all spells with parallel requests for speed
+    // Fetch all spells by following the 'next' URL chain
+    // (the API uses page-based pagination, not offset-based)
     console.log('Fetching all spells from API...');
     let allSpells = [];
-    
-    // First, get the first page to see how many total results there are
-    const firstResponse = await fetch(`${API_BASE}/spells/?limit=500`);
-    const firstData = await firstResponse.json();
-    allSpells = firstData.results;
-    
-    // Calculate how many more pages we need
-    const total = firstData.count;
-    const pageSize = 500;
-    const totalPages = Math.ceil(total / pageSize);
-    
-    console.log(`Total spells: ${total}, fetching ${totalPages} pages...`);
-    
-    // Fetch remaining pages in parallel for speed
-    if (totalPages > 1) {
-        const pagePromises = [];
-        for (let i = 1; i < totalPages; i++) {
-            const offset = i * pageSize;
-            pagePromises.push(
-                fetch(`${API_BASE}/spells/?limit=${pageSize}&offset=${offset}`)
-                    .then(r => r.json())
-                    .then(data => data.results)
-            );
-        }
-        
-        const remainingPages = await Promise.all(pagePromises);
-        remainingPages.forEach(pageResults => {
-            allSpells = allSpells.concat(pageResults);
-        });
+    let nextUrl = `${API_BASE}/spells/?limit=500`;
+    let pageNum = 0;
+
+    while (nextUrl) {
+        pageNum++;
+        const response = await fetch(nextUrl);
+        const data = await response.json();
+        allSpells = allSpells.concat(data.results);
+        nextUrl = data.next; // Follow the next URL exactly as provided by the API
+        console.log(`Page ${pageNum}: fetched ${data.results.length} spells (total so far: ${allSpells.length} / ${data.count})`);
     }
     
     console.log(`Loaded ${allSpells.length} total spells`);
@@ -413,13 +377,15 @@ async function fetchData(target) {
     display.innerHTML = '<div class="loader">Consulting the archives...</div>';
     
     let url;
-    currentCategory = target;
-    currentSort = { column: null, ascending: true }; // Reset sort when changing categories 
-    currentPage = 1; // Reset to first page when changing categories
-    
-    // Reset filters
-    currentRarityFilter = 'all';
-    currentTypeFilter = 'all';
+    // Only update currentCategory for named targets, NOT for pagination URLs
+    // (pagination URLs like ?page=2 should keep the current category name e.g. 'weapons')
+    if (!target.startsWith('http')) {
+        currentCategory = target;
+        currentSort = { column: null, ascending: true };
+        currentPage = 1;
+        currentRarityFilter = 'all';
+        currentTypeFilter = 'all';
+    }
 
     // Redirect "feats" to your local JSON file
     if (target === 'feats') {
@@ -550,7 +516,19 @@ async function handleSearch(event) {
 // --- 4. RENDERING ENGINE ---
 function renderResults(items, category, nextUrl, prevUrl) {
     const display = document.getElementById('display-area');
-    let displayTitle = category;
+    // Use currentCategory for the title (avoids showing raw URLs on paginated pages)
+    const friendlyTitles = {
+        'weapons': 'Weapons',
+        'armor': 'Armor',
+        'monsters': 'Monsters',
+        'magicitems': 'Magic Items',
+        'spells': 'Spells',
+        'backgrounds': 'Backgrounds',
+        'feats': 'Feats',
+        'races': 'Races',
+        'conditions': 'Conditions'
+    };
+    let displayTitle = friendlyTitles[currentCategory] || category;
     let html = `<h1>${displayTitle.toUpperCase()}</h1>`;
     
     if (!items || items.length === 0) {
@@ -603,7 +581,7 @@ function renderResults(items, category, nextUrl, prevUrl) {
             <tr onclick="viewDetails('local-feats', '${item.name.replace(/'/g, "\\'")}')">
                 <td><strong>${item.name}</strong></td>
                 <td>${item.prerequisites || 'None'}</td>
-                <td class="source-tag">${item.source}</td>
+                <td class="source-tag">${item.source || 'SRD'}</td>
             </tr>`).join('');
     } 
     // Spell Table (with Level column and grouping)
@@ -703,7 +681,32 @@ function renderResults(items, category, nextUrl, prevUrl) {
             </tr>`;
         }).join('');
     }
-    // Standard Tables (Weapons, Armor, etc.)
+    // Weapons Table
+    else if (cat === 'weapons') {
+        tableHeader = `<tr><th>Name</th><th>Category</th><th>Damage</th><th>Cost</th><th>Source</th></tr>`;
+        tableRows = itemsToDisplay.map(item => `
+            <tr onclick="viewDetails('weapons', '${item.slug}')">
+                <td><strong>${item.name}</strong></td>
+                <td>${item.category || '—'}</td>
+                <td>${item.damage_dice ? `${item.damage_dice} ${item.damage_type || ''}` : '—'}</td>
+                <td>${item.cost || '—'}</td>
+                <td class="source-tag">${item.document__title || 'SRD'}</td>
+            </tr>`).join('');
+    }
+    // Armor Table
+    else if (cat === 'armor') {
+        tableHeader = `<tr><th>Name</th><th>Category</th><th>Armor Class</th><th>Cost</th><th>Stealth</th><th>Source</th></tr>`;
+        tableRows = itemsToDisplay.map(item => `
+            <tr onclick="viewDetails('armor', '${item.slug}')">
+                <td><strong>${item.name}</strong></td>
+                <td>${item.category || '—'}</td>
+                <td>${item.ac_string || item.base_ac || '—'}</td>
+                <td>${item.cost || '—'}</td>
+                <td>${item.stealth_disadvantage ? '⚠ Disadvantage' : '—'}</td>
+                <td class="source-tag">${item.document__title || 'SRD'}</td>
+            </tr>`).join('');
+    }
+    // Standard Tables (fallback)
     else {
         tableHeader = `<tr><th>Name</th><th>Details</th><th>Source</th></tr>`;
         tableRows = itemsToDisplay.map(item => `
@@ -903,22 +906,21 @@ async function viewDetails(route, identifier) {
     modal.style.display = "block";
     modalBody.innerHTML = '<p class="loader">Consulting the archives...</p>';
 
-    // Logic for your local Feats
+    // Logic for local feats (feats.json)
     if (route === 'local-feats') {
         const feat = allFetchedItems.find(f => f.name === identifier);
         if (!feat) {
             modalBody.innerHTML = "Feat not found.";
             return;
         }
-
-        let benefitsList = feat.benefits.map(b => `<li>${b}</li>`).join('');
+        const benefitsList = (feat.benefits || []).map(b => `<li>${b}</li>`).join('');
         modalBody.innerHTML = `
             <h2 class="detail-header">${feat.name}</h2><hr>
             <div class="description-block">
                 <p><strong>Prerequisite:</strong> ${feat.prerequisites || 'None'}</p>
                 <h3>Benefits</h3>
                 <ul>${benefitsList}</ul>
-                <p class="source-tag">Source: ${feat.source}</p>
+                <p class="source-tag">Source: ${feat.source || 'SRD'}</p>
             </div>`;
         return;
     }
@@ -1152,6 +1154,61 @@ async function viewDetails(route, identifier) {
             contentHtml += `<div class="description-block">${allContent || "<p>No description available.</p>"}</div>`;
         }
         
+        // Weapons display
+        else if (route === 'weapons') {
+            const props = Array.isArray(data.properties) && data.properties.length > 0
+                ? data.properties.join(', ')
+                : '—';
+
+            contentHtml += `
+                <div class="stat-block">
+                    <p><em>${data.category || 'Weapon'}</em></p>
+                    <table style="width:100%; border-collapse:collapse; margin: 15px 0;">
+                        <tr style="background:#f2e1c1;">
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Cost</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Damage</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Weight</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Properties</th>
+                        </tr>
+                        <tr>
+                            <td style="padding:8px; border:1px solid var(--gold);">${data.cost || '—'}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${data.damage_dice ? `${data.damage_dice} ${data.damage_type || ''}` : '—'}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${data.weight || '—'}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${props}</td>
+                        </tr>
+                    </table>
+                    <p class="source-tag">Source: ${data.document__title || 'SRD'}</p>
+                </div>`;
+        }
+
+        // Armor display
+        else if (route === 'armor') {
+            const strReq = data.strength_requirement ? `Str ${data.strength_requirement}` : 'None';
+            const stealthNote = data.stealth_disadvantage ? 'Disadvantage' : 'Normal';
+
+            contentHtml += `
+                <div class="stat-block">
+                    <p><em>${data.category || 'Armor'}</em></p>
+                    <table style="width:100%; border-collapse:collapse; margin: 15px 0;">
+                        <tr style="background:#f2e1c1;">
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Armor Class</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Cost</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Weight</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Str Requirement</th>
+                            <th style="padding:8px; text-align:left; border:1px solid var(--gold);">Stealth</th>
+                        </tr>
+                        <tr>
+                            <td style="padding:8px; border:1px solid var(--gold);"><strong>${data.ac_string || data.base_ac || '—'}</strong></td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${data.cost || '—'}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${data.weight || '—'}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${strReq}</td>
+                            <td style="padding:8px; border:1px solid var(--gold);">${stealthNote}</td>
+                        </tr>
+                    </table>
+                    <p class="source-tag">Source: ${data.document__title || 'SRD'}</p>
+                </div>`;
+        }
+
         // Default / fallback for other categories
         else {
             contentHtml += `<div class="description-block">${marked.parse(data.desc || "<p>No description available.</p>")}</div>`;
